@@ -149,7 +149,7 @@ final class MondayOverlay: NSObject, MTKViewDelegate, AVAudioPlayerDelegate {
                 renderer.camera = MondayStage.camera(bounds: performance.bounds, aspect: aspect, time: time)
             }
         }
-        renderer.rig.pose = performance.motion.pose(at: Float(time))
+        performance.motion.sample(at: Float(time), into: &renderer.rig.pose)
         playbackTime = time
         renderer.mouthIndex = performance.mouth(at: time)
         renderer.faceWeights = MondayChoreography.faceWeights(at: time)

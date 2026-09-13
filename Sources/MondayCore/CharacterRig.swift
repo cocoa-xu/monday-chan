@@ -8,9 +8,14 @@ public final class CharacterRig {
     public var pose: [Transform]
     public private(set) var world: [Matrix4]
     private let names: [String: Int]
+    private let boundsPrimitives: [CharacterPrimitive]
+    private var boundsPalettes: [[Matrix4]]
 
     public init(model: CharacterModel) throws {
         self.model = model
+        var geometries = Set<BoundsGeometry>()
+        boundsPrimitives = model.primitives.filter { geometries.insert(BoundsGeometry($0)).inserted }
+        boundsPalettes = model.skins.map { Array(repeating: matrix_identity_float4x4, count: $0.joints.count) }
         var parents = [Int?](repeating: nil, count: model.nodes.count)
         for (index, node) in model.nodes.enumerated() {
             for child in node.children {
@@ -74,10 +79,40 @@ public final class CharacterRig {
     }
 
     public func bounds() -> Bounds3 {
+        for index in model.skins.indices {
+            let skin = model.skins[index]
+            boundsPalettes[index].withUnsafeMutableBufferPointer { palette in
+                for joint in skin.joints.indices { palette[joint] = world[skin.joints[joint]] * skin.inverseBindMatrices[joint] }
+            }
+        }
         var bounds = Bounds3()
-        for primitive in model.primitives {
-            for position in positions(for: primitive) { bounds.include(position) }
+        for primitive in boundsPrimitives {
+            if let skin = primitive.skin {
+                let matrices = boundsPalettes[skin]
+                for vertex in primitive.vertices {
+                    var position = SIMD4<Float>.zero
+                    for index in 0..<4 { position += matrices[Int(vertex.joints[index])] * vertex.position * vertex.weights[index] }
+                    bounds.include(position.xyz)
+                }
+            } else {
+                let matrix = world[primitive.node]
+                for vertex in primitive.vertices { bounds.include(matrix.point(vertex.position.xyz)) }
+            }
         }
         return bounds
+    }
+}
+
+private struct BoundsGeometry: Hashable {
+    let vertices: UInt
+    let count: Int
+    let skin: Int?
+    let node: Int?
+
+    init(_ primitive: CharacterPrimitive) {
+        vertices = primitive.vertices.withUnsafeBufferPointer { UInt(bitPattern: $0.baseAddress) }
+        count = primitive.vertices.count
+        skin = primitive.skin
+        node = primitive.skin == nil ? primitive.node : nil
     }
 }

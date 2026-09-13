@@ -54,7 +54,7 @@ actor MondayPerformanceLoader {
             var bounds = Bounds3()
             for frame in 0...motion.frameCount {
                 try Task.checkCancellation()
-                rig.pose = motion.pose(at: Float(frame) / Float(motion.frameCount) * motion.duration)
+                motion.sample(at: Float(frame) / Float(motion.frameCount) * motion.duration, into: &rig.pose)
                 rig.updateWorld()
                 let poseBounds = rig.bounds()
                 bounds.include(poseBounds.minimum)
@@ -63,7 +63,7 @@ actor MondayPerformanceLoader {
             var exitBounds = bounds
             for frame in 0...exitMotion.frameCount {
                 try Task.checkCancellation()
-                rig.pose = exitMotion.pose(at: Float(frame) / Float(exitMotion.frameCount) * exitMotion.duration)
+                exitMotion.sample(at: Float(frame) / Float(exitMotion.frameCount) * exitMotion.duration, into: &rig.pose)
                 rig.updateWorld()
                 let poseBounds = rig.bounds()
                 exitBounds.include(poseBounds.minimum)

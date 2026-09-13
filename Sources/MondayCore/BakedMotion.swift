@@ -44,8 +44,20 @@ public struct BakedMotion: Sendable {
     }
 
     public func pose(at time: Float) -> [Transform] {
+        var result: [Transform] = []
+        sample(at: time, into: &result)
+        return result
+    }
+
+    public func sample(at time: Float, into pose: inout [Transform]) {
         let sample = MotionTime(time: time, duration: duration, frameCount: frameCount, loop: loop)
-        return tracks.map { Transform.blend($0.value(at: sample.first), $0.value(at: sample.second), fraction: sample.fraction) }
+        if pose.count != tracks.count { pose = Array(repeating: Transform(), count: tracks.count) }
+        pose.withUnsafeMutableBufferPointer { output in
+            for index in tracks.indices {
+                let track = tracks[index]
+                output[index] = Transform.blend(track.value(at: sample.first), track.value(at: sample.second), fraction: sample.fraction)
+            }
+        }
     }
 }
 
