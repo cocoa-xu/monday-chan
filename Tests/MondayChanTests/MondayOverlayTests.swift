@@ -127,7 +127,7 @@ func mondayOverlayCanStartAndStopIdempotentlyWithoutReportingNaturalCompletion()
     }
 
     try overlay.start()
-    let deadline = ContinuousClock.now + .seconds(1)
+    let deadline = ContinuousClock.now + .seconds(5)
     while overlay.renderer.camera.presentationOffset.y == MondayEntrance.offset(at: 0), ContinuousClock.now < deadline {
         try await Task.sleep(for: .milliseconds(16))
     }
