@@ -2,11 +2,16 @@ import AppKit
 import Foundation
 import MondayMetal
 
+@MainActor
 enum MondaySignArtwork {
     static let attachment = BoardAttachment(anchorNode: "jnt_C_spine00_01", size: SIMD2(0.65, 0.325),
                                              offset: SIMD3(0, 0.63, 0.22))
 
-    static func textureData() throws -> Data {
+    private static let texture = Result { try renderTexture() }
+
+    static func textureData() throws -> Data { try texture.get() }
+
+    private static func renderTexture() throws -> Data {
         guard let url = AppResources.bundle.url(forResource: "monday-sign", withExtension: "svg", subdirectory: "Assets"),
               let source = NSImage(contentsOf: url) else {
             throw CocoaError(.fileReadCorruptFile)

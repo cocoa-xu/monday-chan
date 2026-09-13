@@ -11,11 +11,10 @@ final class RendererResources {
 
     init(device: MTLDevice) throws {
         let bundle = Bundle.main.url(forResource: "MondayChan_MondayMetal", withExtension: "bundle").flatMap(Bundle.init(url:)) ?? Bundle.module
-        guard let shaderURL = bundle.url(forResource: "Character", withExtension: "metal", subdirectory: "Shaders") else {
+        guard let shaderURL = bundle.url(forResource: "Character", withExtension: "metallib") else {
             throw AssetError.missing("character shaders")
         }
-        let source = try String(contentsOf: shaderURL, encoding: .utf8)
-        let library = try device.makeLibrary(source: source, options: nil)
+        let library = try device.makeLibrary(URL: shaderURL)
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.vertexFunction = library.makeFunction(name: "characterVertex")
         descriptor.fragmentFunction = library.makeFunction(name: "characterFragment")

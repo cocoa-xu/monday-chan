@@ -12,7 +12,8 @@ let package = Package(
     targets: [
         .target(name: "MondayCore"),
         .target(name: "MondayImport", dependencies: ["MondayCore"]),
-        .target(name: "MondayMetal", dependencies: ["MondayCore"], resources: [.copy("Shaders")]),
+        .target(name: "MondayMetal", dependencies: ["MondayCore"], exclude: ["Shaders"], plugins: ["CompileMetalShaders"]),
+        .plugin(name: "CompileMetalShaders", capability: .buildTool()),
         .executableTarget(name: "MondayChan", dependencies: [
             "MondayCore", "MondayMetal", "MondayImport",
             .product(name: "FlowingDayControls", package: "flowing-day-ui"),
