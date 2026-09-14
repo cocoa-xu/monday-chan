@@ -38,7 +38,13 @@ import Testing
     let image = try #require(NSImage(contentsOf: output.appendingPathComponent("AppIcon.icns")))
     let sizes = Set(image.representations.map(\.pixelsWide))
     #expect(Set([16, 32, 64, 128, 256, 512, 1024]).isSubset(of: sizes))
+}
 
+@Test(.enabled(if: ProcessInfo.processInfo.environment["CI"] != "true"))
+@MainActor func iconComposerRendersReadableLetteringInEveryAppearance() throws {
+    let output = FileManager.default.temporaryDirectory.appendingPathComponent("Monday Icon Tests \(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: output) }
     let developer = try runIconTool("/usr/bin/xcode-select", arguments: ["-p"], output: output).trimmingCharacters(in: .whitespacesAndNewlines)
     let renderer = URL(fileURLWithPath: developer).deletingLastPathComponent()
         .appendingPathComponent("Applications/Icon Composer.app/Contents/Executables/ictool")
