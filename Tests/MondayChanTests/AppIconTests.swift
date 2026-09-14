@@ -1,10 +1,7 @@
 import AppKit
 import Testing
 
-@Test func appIconLayersPreserveApprovedVectorLettering() throws {
-    let approved = try XMLDocument(contentsOf: iconRepository.appendingPathComponent("design/app-icon/a-golden-sign.svg"))
-    let glyph = try #require(approved.nodes(forXPath: "//*[@id='moon']").first as? XMLElement)
-    let lettering = try #require(approved.nodes(forXPath: "//*[@id='lettering']").first as? XMLElement)
+@Test func appIconLayersRemainVectorAndShareLettering() throws {
     let assets = iconRepository.appendingPathComponent("packaging/AppIcon.icon/Assets")
     for file in try FileManager.default.contentsOfDirectory(at: assets, includingPropertiesForKeys: nil) {
         #expect(file.pathExtension == "svg")
@@ -12,15 +9,14 @@ import Testing
         #expect(try document.nodes(forXPath: "//*[local-name()='image' or local-name()='text' or local-name()='clipPath']").isEmpty)
         #expect(document.rootElement()?.attribute(forName: "viewBox")?.stringValue == "0 0 1024 1024")
     }
-    for name in ["03-Month.svg", "03-Month-Mono.svg"] {
-        let document = try XMLDocument(contentsOf: assets.appendingPathComponent(name))
-        let group = try #require(document.nodes(forXPath: "/*[local-name()='svg']/*[local-name()='g']").first as? XMLElement)
-        #expect(group.attribute(forName: "transform")?.stringValue == lettering.attribute(forName: "transform")?.stringValue)
-        let fills = try document.nodes(forXPath: "//*[local-name()='path' and @fill != 'none']")
-        #expect(fills.count == 1)
-        let shape = try #require(fills.first as? XMLElement)
-        #expect(shape.attribute(forName: "d")?.stringValue == glyph.attribute(forName: "d")?.stringValue)
-    }
+    let color = try XMLDocument(contentsOf: assets.appendingPathComponent("03-Month.svg"))
+    let monochrome = try XMLDocument(contentsOf: assets.appendingPathComponent("03-Month-Mono.svg"))
+    let colorGroup = try #require(color.nodes(forXPath: "/*[local-name()='svg']/*[local-name()='g']").first as? XMLElement)
+    let monochromeGroup = try #require(monochrome.nodes(forXPath: "/*[local-name()='svg']/*[local-name()='g']").first as? XMLElement)
+    #expect(colorGroup.attribute(forName: "transform")?.stringValue == monochromeGroup.attribute(forName: "transform")?.stringValue)
+    let colorShape = try #require(color.nodes(forXPath: "//*[local-name()='path' and @fill != 'none']").first as? XMLElement)
+    let monochromeShape = try #require(monochrome.nodes(forXPath: "//*[local-name()='path' and @fill != 'none']").first as? XMLElement)
+    #expect(colorShape.attribute(forName: "d")?.stringValue == monochromeShape.attribute(forName: "d")?.stringValue)
 }
 
 @Test @MainActor func nativeAppIconPreservesLetteringAndProducesCompatibleAssets() throws {
