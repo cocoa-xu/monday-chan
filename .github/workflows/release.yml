@@ -1,0 +1,170 @@
+name: Release macOS App
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build_with_signing:
+    name: Sign, notarize, and release
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode 26.2
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+          xcodebuild -version
+          swift --version
+
+      - name: Read release version
+        run: |
+          set -euo pipefail
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::Release tags must use vMAJOR.MINOR.PATCH."
+            exit 1
+          fi
+          echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Import Developer ID certificate
+        env:
+          DEV_ID_APP_CERTIFICATE_BASE64: ${{ secrets.DEV_ID_APP_CERTIFICATE_BASE64 }}
+          DEV_ID_APP_CERTIFICATE_PASSWORD: ${{ secrets.DEV_ID_APP_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: |
+          set -euo pipefail
+
+          for variable in DEV_ID_APP_CERTIFICATE_BASE64 DEV_ID_APP_CERTIFICATE_PASSWORD KEYCHAIN_PASSWORD TEAM_ID; do
+            if [[ -z "${!variable}" ]]; then
+              echo "::error::$variable repository secret is not configured."
+              exit 1
+            fi
+          done
+
+          certificate_path="$RUNNER_TEMP/developer-id-application.p12"
+          keychain_path="$RUNNER_TEMP/app-signing.keychain-db"
+          printf '%s' "$DEV_ID_APP_CERTIFICATE_BASE64" | base64 --decode -o "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" -P "$DEV_ID_APP_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+
+          signing_identity=$(
+            security find-identity -v -p codesigning "$keychain_path" |
+              awk -v team_id="$TEAM_ID" '/Developer ID Application:/ && index($0, "(" team_id ")") { print $2; exit }'
+          )
+          if [[ -z "$signing_identity" ]]; then
+            echo "::error::No Developer ID Application identity matches TEAM_ID."
+            exit 1
+          fi
+          echo "CODE_SIGN_IDENTITY=$signing_identity" >> "$GITHUB_ENV"
+
+      - name: Run tests
+        run: swift test -c release
+
+      - name: Build signed apps
+        run: |
+          set -euo pipefail
+
+          build_variant() {
+            variant="$1"
+            architectures="$2"
+            MONDAY_ARCHITECTURES="$architectures" \
+              MONDAY_APP_PATH="$PWD/dist/apps/$variant/MondayChan.app" \
+              APP_VERSION="$APP_VERSION" \
+              APP_BUILD_NUMBER="$GITHUB_RUN_NUMBER" \
+              CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
+              scripts/build.sh
+          }
+
+          build_variant Universal "arm64 x86_64"
+          build_variant Apple-Silicon arm64
+          build_variant Intel x86_64
+
+      - name: Validate signed apps
+        run: |
+          set -euo pipefail
+
+          validate_app() {
+            variant="$1"
+            shift
+            app="dist/apps/$variant/MondayChan.app"
+            executable="$app/Contents/MacOS/MondayChan"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            test "$(codesign -dv --verbose=4 "$app" 2>&1 | sed -n 's/^TeamIdentifier=//p')" = "${{ secrets.TEAM_ID }}"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = moe.uwucocoa.MondayChan
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$APP_VERSION"
+            for architecture in "$@"; do
+              lipo -verify_arch "$architecture" "$executable"
+            done
+          }
+
+          validate_app Universal arm64 x86_64
+          validate_app Apple-Silicon arm64
+          validate_app Intel x86_64
+          test "$(lipo -archs dist/apps/Apple-Silicon/MondayChan.app/Contents/MacOS/MondayChan)" = arm64
+          test "$(lipo -archs dist/apps/Intel/MondayChan.app/Contents/MacOS/MondayChan)" = x86_64
+
+      - name: Create signed disk images
+        run: |
+          set -euo pipefail
+          npm install --global --allow-scripts=fs-xattr,macos-alias appdmg@0.6.6
+          mkdir -p dist/dmgs
+          for variant in Universal Apple-Silicon Intel; do
+            scripts/create-dmg.sh \
+              "dist/apps/$variant/MondayChan.app" \
+              "dist/dmgs/Monday-chan-$variant.dmg"
+          done
+
+      - name: Notarize disk images
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: |
+          set -euo pipefail
+
+          for variable in APPLE_ID NOTARY_PASSWORD TEAM_ID; do
+            if [[ -z "${!variable}" ]]; then
+              echo "::error::$variable repository secret is not configured."
+              exit 1
+            fi
+          done
+
+          for disk_image in dist/dmgs/*.dmg; do
+            xcrun notarytool submit \
+              --team-id "$TEAM_ID" \
+              --apple-id "$APPLE_ID" \
+              --password "$NOTARY_PASSWORD" \
+              --wait "$disk_image"
+            xcrun stapler staple "$disk_image"
+            xcrun stapler validate "$disk_image"
+            codesign --verify --strict --verbose=2 "$disk_image"
+          done
+
+      - name: Upload release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/dmgs/*.dmg
+          generate_release_notes: true
+
+      - name: Delete temporary signing files
+        if: ${{ always() }}
+        run: |
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/developer-id-application.p12"

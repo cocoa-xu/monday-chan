@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test and build
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode 26.2
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+          xcodebuild -version
+          swift --version
+
+      - name: Run tests
+        run: swift test -c release
+
+      - name: Build release variants
+        run: |
+          set -euo pipefail
+
+          build_variant() {
+            variant="$1"
+            architectures="$2"
+            MONDAY_ARCHITECTURES="$architectures" \
+              MONDAY_APP_PATH="$PWD/dist/apps/$variant/MondayChan.app" \
+              scripts/build.sh
+          }
+
+          build_variant Universal "arm64 x86_64"
+          build_variant Apple-Silicon arm64
+          build_variant Intel x86_64
+
+      - name: Validate release variants
+        run: |
+          set -euo pipefail
+
+          validate_app() {
+            variant="$1"
+            shift
+            app="dist/apps/$variant/MondayChan.app"
+            executable="$app/Contents/MacOS/MondayChan"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            plutil -lint "$app/Contents/Info.plist"
+            test -f "$app/Contents/Resources/MondayChan_MondayImport.bundle/MondayImport.metallib"
+            test -f "$app/Contents/Resources/MondayChan_MondayMetal.bundle/MondayMetal.metallib"
+            for architecture in "$@"; do
+              lipo -verify_arch "$architecture" "$executable"
+            done
+          }
+
+          validate_app Universal arm64 x86_64
+          validate_app Apple-Silicon arm64
+          validate_app Intel x86_64
+
+          test "$(lipo -archs dist/apps/Apple-Silicon/MondayChan.app/Contents/MacOS/MondayChan)" = arm64
+          test "$(lipo -archs dist/apps/Intel/MondayChan.app/Contents/MacOS/MondayChan)" = x86_64
+
+          forbidden=$(find dist/apps -type f \( -name '*.metal' -o -name '*.glb' -o -name '*.m4a' -o -name '*.mp4' -o -name '*.mov' \) -print -quit)
+          test -z "$forbidden"
