@@ -296,10 +296,8 @@ struct MondayOnboardingView: View {
                 Text(text("Nothing is uploaded. Imported files stay on this Mac."))
                     .font(.caption).foregroundStyle(FlowingPalette.faint)
                 Spacer()
-                Button(action: model.startImport) {
-                    Text(text(model.state == .selection ? "Import" : "Retry")).foregroundStyle(MondayTheme.onAccent)
-                }
-                    .buttonStyle(FlowingSoftButtonStyle(isProminent: true)).disabled(!model.canImport)
+                Button(text(model.state == .selection ? "Import" : "Retry"), action: model.startImport)
+                    .buttonStyle(FlowingSoftButtonStyle()).disabled(!model.canImport)
             }
         }
     }
