@@ -29,6 +29,9 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Install Metal Toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
+
       - name: Read release version
         run: |
           set -euo pipefail
