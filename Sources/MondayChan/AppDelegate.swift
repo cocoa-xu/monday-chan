@@ -6,6 +6,7 @@ import MondayCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let localization = AppLocalization()
+    private let appearance = MondayAppearance()
     private var controller: MondayController?
     private var preferences: PreferencesWindowPresenter<PreferencesRoot>?
     private var onboarding: OnboardingWindow?
@@ -13,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var languageSubscription: AnyCancellable?
     private var stateSubscription: AnyCancellable?
     private var localeSubscription: AnyCancellable?
+    private var appearanceSubscription: AnyCancellable?
     private var startupTask: Task<Void, Never>?
     private var dataRoot: URL!
 
@@ -65,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let controller = MondayController(library: try AssetLibrary(root: dataRoot))
             self.controller = controller
             preferences = PreferencesWindowPresenter(rootView: PreferencesRoot(
-                controller: controller, localization: localization, dataRoot: dataRoot,
+                controller: controller, localization: localization, appearance: appearance, dataRoot: dataRoot,
                 manageResources: { [weak self] in self?.showOnboarding() }
             ))
             stateSubscription = controller.$state.dropFirst().sink { [weak self] _ in
@@ -101,6 +103,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func installSubscriptions() {
+        appearanceSubscription = appearance.$menuBarIconStyle.sink { [weak self] style in
+            guard let button = self?.statusItem?.button else { return }
+            MondayMenuBarIcon.apply(style, to: button)
+        }
         languageSubscription = localization.$text.sink { [weak self] _ in
             self?.preferences?.window.title = self?.localization.text("Preferences") ?? "Preferences"
             self?.installMenus()
@@ -123,8 +129,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         let quit = menu.addItem(withTitle: text("Quit Monday-chan"), action: #selector(quit), keyEquivalent: "q")
         quit.target = self
-        if statusItem == nil { statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength) }
-        statusItem?.button?.image = NSImage(systemSymbolName: "calendar.badge.clock", accessibilityDescription: "Monday-chan")
+        if statusItem == nil { statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength) }
+        if let button = statusItem?.button { MondayMenuBarIcon.apply(appearance.menuBarIconStyle, to: button) }
         statusItem?.menu = menu
         let main = NSMenu()
         let item = main.addItem(withTitle: "Monday-chan", action: nil, keyEquivalent: "")

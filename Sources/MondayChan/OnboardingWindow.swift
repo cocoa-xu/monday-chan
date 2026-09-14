@@ -206,12 +206,16 @@ struct MondayOnboardingView: View {
         .overlay { RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(FlowingPalette.hairline) }
         .environment(\.locale, text.locale)
         .environment(\.flowingStrings, text.controls)
+        .flowingAccent(MondayTheme.accent)
+        .tint(MondayTheme.accent.fill)
     }
 
     private var rail: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                Image(systemName: "calendar.badge.clock").font(.system(size: 25)).foregroundStyle(Color.accentColor)
+                if let image = MondayMenuBarIcon.sign {
+                    Image(nsImage: image).resizable().scaledToFit().frame(width: 30, height: 25)
+                }
                 Text("Monday-chan").font(.system(size: 18, weight: .bold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.8)
             }
             Spacer().frame(height: 54)
@@ -235,7 +239,7 @@ struct MondayOnboardingView: View {
 
     private func step(_ number: String, _ title: String, active: Bool) -> some View {
         HStack(spacing: 10) {
-            Text(number).font(.system(.caption, design: .monospaced)).foregroundStyle(active ? Color.accentColor : FlowingPalette.faint)
+            Text(number).font(.system(.caption, design: .monospaced)).foregroundStyle(active ? MondayTheme.accent.foreground : FlowingPalette.faint)
             Text(title).font(.caption).foregroundStyle(active ? FlowingPalette.ink : FlowingPalette.muted)
         }
     }
@@ -311,7 +315,7 @@ struct MondayOnboardingView: View {
     private func sourceCard(title: String, detail: String?, empty: String, action: @escaping () -> Void) -> some View {
         HStack(spacing: 14) {
             Image(systemName: detail == nil ? "circle.dashed" : "checkmark.circle.fill")
-                .font(.title2).foregroundStyle(detail == nil ? FlowingPalette.muted : Color.accentColor)
+                .font(.title2).foregroundStyle(detail == nil ? FlowingPalette.muted : MondayTheme.accent.foreground)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.headline)
                 Text(detail ?? empty).font(.caption).foregroundStyle(FlowingPalette.muted).lineLimit(2)

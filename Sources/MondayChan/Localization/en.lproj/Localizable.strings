@@ -103,3 +103,9 @@
 "The import destination is unsafe." = "The import destination is unsafe.";
 "The imported assets are incomplete: %@" = "The imported assets are incomplete: %@";
 "Download the original clip yourself, then choose or drop the MP4 or MOV here. The app extracts a local audio copy and leaves your video unchanged." = "Download the original clip yourself, then choose or drop the MP4 or MOV here. The app extracts a local audio copy and leaves your video unchanged.";
+"Menu Bar" = "Menu Bar";
+"Icon style" = "Icon style";
+"Choose a miniature sign or a simple 月 character." = "Choose a miniature sign or a simple 月 character.";
+"Mini sign" = "Mini sign";
+"Plain text" = "Plain text";
+"Preview" = "Preview";

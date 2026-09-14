@@ -103,3 +103,9 @@
 "The import destination is unsafe." = "インポート先を安全に使用できません。";
 "The imported assets are incomplete: %@" = "インポートしたリソースが不足しています：%@";
 "Download the original clip yourself, then choose or drop the MP4 or MOV here. The app extracts a local audio copy and leaves your video unchanged." = "元のクリップをご自身でダウンロードし、MP4またはMOVを選択するか、ここにドロップしてください。アプリはローカル用の音声を抽出し、動画ファイルは変更しません。";
+"Menu Bar" = "メニューバー";
+"Icon style" = "アイコンの表示";
+"Choose a miniature sign or a simple 月 character." = "小さな看板、または「月」の文字を表示します。";
+"Mini sign" = "ミニ看板";
+"Plain text" = "文字のみ";
+"Preview" = "プレビュー";
