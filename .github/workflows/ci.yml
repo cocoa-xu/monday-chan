@@ -64,7 +64,7 @@ jobs:
             test -f "$app/Contents/Resources/MondayChan_MondayImport.bundle/MondayImport.metallib"
             test -f "$app/Contents/Resources/MondayChan_MondayMetal.bundle/MondayMetal.metallib"
             for architecture in "$@"; do
-              lipo -verify_arch "$architecture" "$executable"
+              lipo "$executable" -verify_arch "$architecture"
             done
           }
 

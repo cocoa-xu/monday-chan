@@ -36,7 +36,20 @@ jobs:
             echo "::error::Release tags must use vMAJOR.MINOR.PATCH."
             exit 1
           fi
-          echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          app_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' packaging/Info.plist)
+          build_number=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' packaging/Info.plist)
+          if [[ "${GITHUB_REF_NAME#v}" != "$app_version" ]]; then
+            echo "::error::The release tag does not match CFBundleShortVersionString."
+            exit 1
+          fi
+          if [[ ! "$build_number" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::CFBundleVersion must be a positive integer."
+            exit 1
+          fi
+          {
+            echo "APP_VERSION=$app_version"
+            echo "APP_BUILD_NUMBER=$build_number"
+          } >> "$GITHUB_ENV"
 
       - name: Import Developer ID certificate
         env:
@@ -87,7 +100,7 @@ jobs:
             MONDAY_ARCHITECTURES="$architectures" \
               MONDAY_APP_PATH="$PWD/dist/apps/$variant/MondayChan.app" \
               APP_VERSION="$APP_VERSION" \
-              APP_BUILD_NUMBER="$GITHUB_RUN_NUMBER" \
+              APP_BUILD_NUMBER="$APP_BUILD_NUMBER" \
               CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
               scripts/build.sh
           }
@@ -109,8 +122,9 @@ jobs:
             test "$(codesign -dv --verbose=4 "$app" 2>&1 | sed -n 's/^TeamIdentifier=//p')" = "${{ secrets.TEAM_ID }}"
             test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = moe.uwucocoa.MondayChan
             test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$APP_VERSION"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = "$APP_BUILD_NUMBER"
             for architecture in "$@"; do
-              lipo -verify_arch "$architecture" "$executable"
+              lipo "$executable" -verify_arch "$architecture"
             done
           }
 
