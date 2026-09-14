@@ -35,6 +35,14 @@ func binary16ConversionIsArchitectureIndependent(_ input: UInt16, _ output: UInt
     }
 }
 
+@Test func gameReleaseIdentificationRequiresAnExactKnownResourceSet() throws {
+    let release = MondayGameRelease.v1_1_1
+    #expect(MondayGameRelease.identify(fingerprints: release.fingerprints) == release)
+    var changed = release.fingerprints
+    changed[.hair] = String(repeating: "0", count: 64)
+    #expect(MondayGameRelease.identify(fingerprints: changed) == nil)
+}
+
 @Test func bundleDiscoveryRejectsAmbiguousCachesAndSkipsSymlinks() throws {
     let root = try extractionDirectory()
     defer { try? FileManager.default.removeItem(at: root) }

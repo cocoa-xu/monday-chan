@@ -24,6 +24,7 @@ public enum MondayAssetExtractor {
         do {
             if try copyPrepared(from: source, to: destination) { return }
             let files = try MondayBundleFiles.locate(in: source)
+            _ = try files.gameRelease()
             progress(.model)
             let body = try files.load(.body)
             let hair = try files.load(.hair)

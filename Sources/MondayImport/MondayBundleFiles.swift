@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import MondayCore
 
@@ -22,6 +23,49 @@ enum MondayBundleKind: CaseIterable {
     }
 
     var cacheDirectory: String { identifier.utf8.map { String(format: "%02X", $0) }.joined() }
+}
+
+enum MondayGameRelease: String, CaseIterable {
+    case v1_1_1 = "1.1.1"
+
+    var fingerprints: [MondayBundleKind: String] {
+        switch self {
+        case .v1_1_1:
+            [
+                .body: "f4aed80813f704b189627abe7360ddf3637aba577bee16238df0bcb5e2690894",
+                .hair: "1a2c657b1b2b6b7245b456b882eb4b407c410618cded2477ecc78791eac174ec",
+                .idle: "39dcf4b88469f5967078580f1cee2ed8c0a2c750caf0a7334e3446b8326e31e3",
+                .run: "5e6478c1d6cb138163ae2ded40cf9df079b262410fa6519e973074c5b09d6f13"
+            ]
+        }
+    }
+
+    static func identify(fingerprints: [MondayBundleKind: String]) -> MondayGameRelease? {
+        allCases.first { $0.fingerprints == fingerprints }
+    }
+
+    static func identify(files: MondayBundleFiles) throws -> MondayGameRelease {
+        var fingerprints: [MondayBundleKind: String] = [:]
+        for kind in MondayBundleKind.allCases {
+            guard let url = files.urls[kind] else { throw AssetError.missing(kind.identifier) }
+            fingerprints[kind] = try fingerprint(url)
+        }
+        guard let release = identify(fingerprints: fingerprints) else {
+            throw AssetError.invalid("unsupported game version")
+        }
+        return release
+    }
+
+    private static func fingerprint(_ url: URL) throws -> String {
+        let file = try FileHandle(forReadingFrom: url)
+        defer { try? file.close() }
+        var hash = SHA256()
+        while let data = try file.read(upToCount: 1024 * 1024), !data.isEmpty {
+            try Task.checkCancellation()
+            hash.update(data: data)
+        }
+        return hash.finalize().map { String(format: "%02x", $0) }.joined()
+    }
 }
 
 struct MondayBundleFiles {
@@ -64,5 +108,9 @@ struct MondayBundleFiles {
         guard let url = urls[kind] else { throw AssetError.missing(kind.identifier) }
         try Task.checkCancellation()
         return try UnityAssetBundle(data: Data(contentsOf: url, options: .mappedIfSafe), headerKey: kind.address)
+    }
+
+    func gameRelease() throws -> MondayGameRelease {
+        try MondayGameRelease.identify(files: self)
     }
 }
