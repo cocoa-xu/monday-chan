@@ -3,6 +3,21 @@ import MondayCore
 import Testing
 @testable import MondayImport
 
+@Test(arguments: [
+    (UInt16(0x0000), UInt32(0x0000_0000)),
+    (UInt16(0x8000), UInt32(0x8000_0000)),
+    (UInt16(0x0001), UInt32(0x3380_0000)),
+    (UInt16(0x0400), UInt32(0x3880_0000)),
+    (UInt16(0x3c00), UInt32(0x3f80_0000)),
+    (UInt16(0xc000), UInt32(0xc000_0000)),
+    (UInt16(0x7bff), UInt32(0x477f_e000)),
+    (UInt16(0x7c00), UInt32(0x7f80_0000)),
+    (UInt16(0x7e00), UInt32(0x7fc0_0000))
+])
+func binary16ConversionIsArchitectureIndependent(_ input: UInt16, _ output: UInt32) {
+    #expect(Float(binary16: input).bitPattern == output)
+}
+
 @Test func bundleDiscoveryFindsOnlyRequiredNamedAndCachedAssets() throws {
     let root = try extractionDirectory()
     defer { try? FileManager.default.removeItem(at: root) }

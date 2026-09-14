@@ -11,7 +11,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "MondayCore"),
-        .target(name: "MondayImport", dependencies: ["MondayCore"]),
+        .target(name: "MondayImport", dependencies: ["MondayCore"], exclude: ["Shaders"], plugins: ["CompileMetalShaders"]),
         .target(name: "MondayMetal", dependencies: ["MondayCore"], exclude: ["Shaders"], plugins: ["CompileMetalShaders"]),
         .plugin(name: "CompileMetalShaders", capability: .buildTool()),
         .executableTarget(name: "MondayChan", dependencies: [

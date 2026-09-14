@@ -184,8 +184,8 @@ private final class GLBExporter {
             let uvBase = base1 + index * stride1 + uvOffset
             let u: Float, v: Float
             if halfUV {
-                u = Float(Float16(bitPattern: try data.uint16(at: uvBase)))
-                v = Float(Float16(bitPattern: try data.uint16(at: uvBase + 2)))
+                u = Float(binary16: try data.uint16(at: uvBase))
+                v = Float(binary16: try data.uint16(at: uvBase + 2))
             } else {
                 u = try data.float32(at: uvBase); v = try data.float32(at: uvBase + 4)
             }

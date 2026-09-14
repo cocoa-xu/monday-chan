@@ -11,7 +11,7 @@ final class RendererResources {
 
     init(device: MTLDevice) throws {
         let bundle = Bundle.main.url(forResource: "MondayChan_MondayMetal", withExtension: "bundle").flatMap(Bundle.init(url:)) ?? Bundle.module
-        guard let shaderURL = bundle.url(forResource: "Character", withExtension: "metallib") else {
+        guard let shaderURL = bundle.url(forResource: "MondayMetal", withExtension: "metallib") else {
             throw AssetError.missing("character shaders")
         }
         let library = try device.makeLibrary(URL: shaderURL)
