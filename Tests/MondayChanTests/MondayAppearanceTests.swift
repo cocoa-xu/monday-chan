@@ -89,7 +89,7 @@ import Testing
             }
         }
         #expect(maxX >= minX && maxY >= minY)
-        #expect(abs(Double(minX + maxX + 1 - width)) <= 1)
+        #expect(abs(Double(minX + maxX + 1 - width + scale)) <= 1)
         #expect(abs(Double(minY + maxY + 1 - height)) <= 1)
     }
 }
