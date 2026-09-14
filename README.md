@@ -2,6 +2,10 @@
 
 A small macOS desktop performance: Kanade peeks up from the bottom of your screen, jumps around with a Monday placard, and runs away.
 
+[Watch the Demo](assets/demo.mp4)
+
+*This demo video is silent; audio has been removed.*
+
 - Native Metal rendering, synchronized expressions, and transparent mouse passthrough.
 - Preview on demand or schedule one Sunday-night surprise on your selected monitors.
 - English and Japanese, using [FlowingDayUI](https://github.com/cocoa-xu/flowing-day-ui).
@@ -11,7 +15,7 @@ Requires macOS 14 or later on an Apple Silicon or Intel Mac with Metal 3. No gam
 ## Set up
 
 1. Install and open [hololive Dreams](https://hololive.hololivepro.com/en/news/20260723-01-401/), sign in, and let the game finish downloading its resource data. Export the downloaded resource directory from your phone using a method you choose, then select that folder in Monday-chan’s first-run window.
-2. Save the video from [YouTube Japan’s original post](https://x.com/YouTubeJapan/status/2091495920311414921), then drop the downloaded MP4/MOV into the window or choose it from disk. The clip is approximately 11 seconds long.
+2. Save the video from [YouTube Japan’s original post](https://x.com/YouTubeJapan/status/2091495920311414921), then drop the downloaded MP4/MOV into the window or choose it from disk.
 3. Preview the audio and import. Choose your monitors in Preferences, then press Play.
 
 Only the required character resources are imported. Audio is extracted locally into lossless ALAC. Your source files remain unchanged; nothing is uploaded. Right-click Kanade to dismiss her.
