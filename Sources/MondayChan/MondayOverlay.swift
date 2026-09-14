@@ -21,40 +21,31 @@ final class MondayOverlayView: MTKView {
 }
 
 @MainActor
-final class MondayOverlay: NSObject, MTKViewDelegate, AVAudioPlayerDelegate {
+final class MondayOverlay: NSObject, MTKViewDelegate {
     let window: MondayOverlayWindow
     let view: MondayOverlayView
     let renderer: CharacterRenderer
     private(set) var playbackTime: Double = 0
-    var isPlayingAudio: Bool { state == .playing && audioPlayer?.isPlaying == true }
-    var isExiting: Bool {
-        if case .exiting = state { return true }
-        return state == .waitingForExitFrame
-    }
-
-    private enum State: Equatable {
-        case idle
-        case waitingForFirstFrame
-        case entrance(startedAt: CFTimeInterval)
-        case waitingForAudio
-        case playing
-        case exiting(startedAt: CFTimeInterval)
-        case waitingForExitFrame
-        case stopped
-    }
+    let playback: MondayPlayback
+    var isPlayingAudio: Bool { !isStopped && playback.isPlaying }
+    var isExiting: Bool { playback.exitStartedAt != nil }
+    private let participant = UUID()
+    private let ownsPlayback: Bool
+    private var isStopped = false
+    private var isStarted = false
 
     private let performance: MondayPerformance
     private let audioStartTime: Double
     private let onFinished: () -> Void
     private let onError: (Error) -> Void
-    private var audioPlayer: AVAudioPlayer?
-    private var state = State.idle
     private var didFinish = false
 
-    init(performance: MondayPerformance, library: AssetLibrary, display: MondayDisplay, volume: Float,
-         onError: @escaping (Error) -> Void = { _ in },
+    init(performance: MondayPerformance, library: AssetLibrary, display: MondayDisplay, volume: Float, playback: MondayPlayback? = nil,
+         onDismiss: (() -> Void)? = nil, onError: @escaping (Error) -> Void = { _ in },
          onFinished: @escaping () -> Void) throws {
         self.performance = performance
+        ownsPlayback = playback == nil
+        self.playback = try playback ?? MondayPlayback(performance: performance, volume: volume)
         audioStartTime = performance.audioStartTime
         playbackTime = performance.audioStartTime
         self.onFinished = onFinished
@@ -67,38 +58,31 @@ final class MondayOverlay: NSObject, MTKViewDelegate, AVAudioPlayerDelegate {
         camera.presentationOffset.y = MondayEntrance.offset(at: 0)
         renderer.camera = camera
 
-        let player = try AVAudioPlayer(contentsOf: performance.audioURL)
-        player.volume = min(max(volume, 0), 1)
-        player.currentTime = audioStartTime
-        audioPlayer = player
         window = MondayOverlayWindow(contentRect: display.frame, styleMask: [.borderless, .nonactivatingPanel],
                                      backing: .buffered, defer: false)
         view = MondayOverlayView(frame: NSRect(origin: .zero, size: display.frame.size), device: renderer.device)
         super.init()
-        player.delegate = self
         configureWindow(display: display)
         configureView(display: display)
         renderer.rig.pose = performance.motion.pose(at: Float(audioStartTime))
         renderer.mouthIndex = performance.mouth(at: audioStartTime)
         renderer.faceWeights = MondayChoreography.faceWeights(at: audioStartTime)
         renderer.coverageUpdated = { [weak self] in self?.renderingCompleted() }
-        view.dismiss = { [weak self] in self?.finish() }
+        view.dismiss = onDismiss ?? { [weak self] in self?.finish() }
     }
 
     func start() throws {
-        guard state == .idle else { return }
-        guard audioPlayer?.prepareToPlay() == true else { throw AssetError.invalid("Monday audio playback") }
-        state = .waitingForFirstFrame
+        guard !isStarted, !isStopped else { return }
+        try playback.prepare()
+        isStarted = true
         view.isPaused = false
         window.orderFrontRegardless()
     }
 
     func stop() {
-        guard state != .stopped else { return }
-        state = .stopped
-        audioPlayer?.stop()
-        audioPlayer?.delegate = nil
-        audioPlayer = nil
+        guard !isStopped else { return }
+        isStopped = true
+        if ownsPlayback { playback.stop() }
         renderer.coverageUpdated = nil
         view.delegate = nil
         view.isPaused = true
@@ -106,77 +90,46 @@ final class MondayOverlay: NSObject, MTKViewDelegate, AVAudioPlayerDelegate {
         window.close()
     }
 
-    func setVolume(_ volume: Float) {
-        audioPlayer?.volume = min(max(volume, 0), 1)
-    }
+    func setVolume(_ volume: Float) { playback.setVolume(volume) }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     func draw(in view: MTKView) {
-        guard state != .stopped else { return }
+        guard !isStopped else { return }
+        if let error = playback.error { finish(error: error); return }
         let aspect = Float(view.drawableSize.width / max(view.drawableSize.height, 1))
         if isExiting {
-            let elapsed: Double
-            if case .exiting(let startedAt) = state {
-                elapsed = min(CACurrentMediaTime() - startedAt, MondayStage.exitDuration)
-            } else {
-                elapsed = MondayStage.exitDuration
-            }
+            let elapsed = min(CACurrentMediaTime() - (playback.exitStartedAt ?? CACurrentMediaTime()), MondayStage.exitDuration)
             renderer.camera = MondayStage.exitCamera(bounds: performance.bounds, exitBounds: performance.exitBounds,
                                                       aspect: aspect, time: elapsed)
             renderer.rig.pose = MondayStage.exitPose(performance: performance, time: elapsed)
             renderer.mouthIndex = 0
             renderer.faceWeights = [:]
             if elapsed >= MondayStage.exitDuration {
-                state = .waitingForExitFrame
-                renderer.draw(in: view) { [weak self] in self?.finishExit() }
+                renderer.draw(in: view) { [weak self] in self?.finish() }
             } else {
                 renderer.draw(in: view)
             }
             updateHitTesting()
             return
         }
-        let time: Double
-        if case .entrance(let startedAt) = state {
-            let duration = Double(MondayEntrance.duration)
-            let elapsed = min(CACurrentMediaTime() - startedAt, duration)
-            renderer.camera.presentationOffset.y = MondayEntrance.offset(at: elapsed)
-            if elapsed >= duration { state = .waitingForAudio }
-            time = audioStartTime
+        let time = playback.time
+        let entranceElapsed = playback.entranceStartedAt.map { CACurrentMediaTime() - $0 } ?? 0
+        if playback.isPlaying {
+            renderer.camera = MondayStage.camera(bounds: performance.bounds, aspect: aspect, time: time)
         } else {
-            time = state == .playing ? audioPlayer?.currentTime ?? audioStartTime : audioStartTime
-            if state == .playing {
-                renderer.camera = MondayStage.camera(bounds: performance.bounds, aspect: aspect, time: time)
-            }
+            renderer.camera.presentationOffset.y = MondayEntrance.offset(at: min(entranceElapsed, Double(MondayEntrance.duration)))
         }
         performance.motion.sample(at: Float(time), into: &renderer.rig.pose)
         playbackTime = time
         renderer.mouthIndex = performance.mouth(at: time)
         renderer.faceWeights = MondayChoreography.faceWeights(at: time)
-        if state == .waitingForAudio {
-            renderer.draw(in: view) { [weak self] in self?.startAudioAfterEntrance() }
+        if !playback.isPlaying && entranceElapsed >= Double(MondayEntrance.duration) {
+            renderer.draw(in: view) { [weak self] in self?.entranceRendered() }
         } else {
             renderer.draw(in: view)
         }
         updateHitTesting()
-    }
-
-    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor [weak self] in
-            guard let self, self.state == .playing else { return }
-            if flag {
-                self.audioPlayer?.stop()
-                self.audioPlayer?.delegate = nil
-                self.audioPlayer = nil
-                self.state = .exiting(startedAt: CACurrentMediaTime())
-            } else {
-                self.finish(error: AssetError.invalid("Monday audio playback"))
-            }
-        }
-    }
-
-    nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: (any Error)?) {
-        Task { @MainActor [weak self] in self?.finish(error: error ?? AssetError.invalid("Monday audio decoding")) }
     }
 
     private func configureWindow(display: MondayDisplay) {
@@ -209,26 +162,12 @@ final class MondayOverlay: NSObject, MTKViewDelegate, AVAudioPlayerDelegate {
 
     private func renderingCompleted() {
         updateHitTesting()
-        switch state {
-        case .waitingForFirstFrame:
-            state = .entrance(startedAt: CACurrentMediaTime())
-        default:
-            break
-        }
+        playback.firstFrameRendered(by: participant)
     }
 
-    private func startAudioAfterEntrance() {
-        guard state == .waitingForAudio else { return }
-        guard audioPlayer?.play() == true else {
-            finish(error: AssetError.invalid("Monday audio playback"))
-            return
-        }
-        state = .playing
-    }
-
-    private func finishExit() {
-        guard state == .waitingForExitFrame else { return }
-        finish()
+    private func entranceRendered() {
+        guard !isStopped else { return }
+        playback.entranceRendered(by: participant)
     }
 
     private func updateHitTesting() {
@@ -238,7 +177,7 @@ final class MondayOverlay: NSObject, MTKViewDelegate, AVAudioPlayerDelegate {
     }
 
     private func finish(error: Error? = nil) {
-        guard state != .stopped, !didFinish else { return }
+        guard !isStopped, !didFinish else { return }
         didFinish = true
         stop()
         if let error { onError(error) }

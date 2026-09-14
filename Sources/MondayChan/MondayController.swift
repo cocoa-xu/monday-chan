@@ -5,107 +5,101 @@ import MondayCore
 @MainActor
 final class MondayController: ObservableObject {
     enum PlaybackError: Error { case missingAudio, missingCharacter, other(Error) }
+    enum PlaybackState: Equatable { case idle, loading, playing }
 
-    enum PlaybackState: Equatable {
-        case idle
-        case loading
-        case playing
-    }
-
-    @Published var selectedDisplayID: String? {
+    @Published var selectedDisplayIDs: Set<String> {
         didSet {
-            defaults.set(selectedDisplayID, forKey: Keys.displayID)
+            defaults.set(selectedDisplayIDs.sorted(), forKey: "monday.displayIDs")
             error = nil
-            displayConfigurationChanged()
+            if state != .idle { stop() }
             evaluateAutomaticPlayback()
         }
     }
     @Published var trigger: MondayTrigger {
         didSet {
-            defaults.set(trigger.rawValue, forKey: Keys.trigger)
+            defaults.set(trigger.rawValue, forKey: "monday.trigger")
             error = nil
-            resetMouseBaseline()
+            evaluateAutomaticPlayback()
+        }
+    }
+    @Published var allowsDuringFocus: Bool {
+        didSet {
+            defaults.set(allowsDuringFocus, forKey: "monday.allowsDuringFocus")
             evaluateAutomaticPlayback()
         }
     }
     @Published var volume: Double {
         didSet {
             let normalized = volume.isFinite ? min(max(volume, 0), 1) : 0.8
-            if normalized != volume {
-                volume = normalized
-                return
-            }
-            defaults.set(volume, forKey: Keys.volume)
-            overlay?.setVolume(Float(volume))
+            if normalized != volume { volume = normalized; return }
+            defaults.set(volume, forKey: "monday.volume")
+            playback?.setVolume(Float(volume))
         }
     }
     @Published private(set) var state: PlaybackState = .idle
     @Published private(set) var error: Error?
     @Published private(set) var displays: [MondayDisplay]
-
-    var selectedDisplay: MondayDisplay? { displays.first { $0.id == selectedDisplayID } }
-
-    private enum Keys {
-        static let displayID = "monday.displayID"
-        static let trigger = "monday.trigger"
-        static let volume = "monday.volume"
-        static let completedDays = "monday.completedDays"
-    }
+    @Published private(set) var focusIsUnavailable = false
+    var selectedDisplays: [MondayDisplay] { displays.filter { selectedDisplayIDs.contains($0.id) } }
 
     private let library: AssetLibrary
     private let defaults: UserDefaults
     private let loadPerformance: @Sendable (AssetLibrary) async throws -> MondayPerformance
     private let displayProvider: @MainActor () -> [MondayDisplay]
+    private let focusProvider: @MainActor () -> Bool?
     private let now: () -> Date
     private let timeZone: () -> TimeZone
     private var completedDays: Set<String>
     private var loadTask: Task<Void, Never>?
-    private var overlay: MondayOverlay?
-    private var playbackDisplay: MondayDisplay?
+    private var overlays: [MondayOverlay] = []
+    private var playback: MondayPlayback?
+    private var playbackDisplays: [MondayDisplay] = []
+    private var completedDisplays: Set<String> = []
     private var playbackGeneration = UUID()
     private var isClosed = false
     private var timer: Timer?
     private var observers: [NSObjectProtocol] = []
     private enum UnavailableReason { case sleeping, inactive }
     private var unavailableReasons: Set<UnavailableReason> = []
-    private var mouseBaseline: UInt32?
 
     init(library: AssetLibrary, defaults: UserDefaults = .standard,
          loader: MondayPerformanceLoader = MondayPerformanceLoader(),
          loadPerformance: (@Sendable (AssetLibrary) async throws -> MondayPerformance)? = nil,
          displays: @escaping @MainActor () -> [MondayDisplay] = { MondayDisplay.connected },
          now: @escaping () -> Date = Date.init,
-         timeZone: @escaping () -> TimeZone = { .autoupdatingCurrent }) {
+         timeZone: @escaping () -> TimeZone = { .autoupdatingCurrent },
+         focus: @escaping @MainActor () -> Bool? = { MondayFocus.isFocused }) {
         self.library = library
         self.defaults = defaults
         self.loadPerformance = loadPerformance ?? { library in try await loader.load(library: library) }
-        self.displayProvider = displays
+        displayProvider = displays
+        focusProvider = focus
         self.now = now
         self.timeZone = timeZone
         self.displays = displays()
-        selectedDisplayID = defaults.string(forKey: Keys.displayID)
-        trigger = defaults.string(forKey: Keys.trigger).flatMap(MondayTrigger.init(rawValue:)) ?? .manual
-        let storedVolume = defaults.object(forKey: Keys.volume) == nil ? 0.8 : defaults.double(forKey: Keys.volume)
+        selectedDisplayIDs = Set(defaults.stringArray(forKey: "monday.displayIDs")
+                                 ?? defaults.string(forKey: "monday.displayID").map { [$0] } ?? [])
+        trigger = defaults.string(forKey: "monday.trigger").flatMap(MondayTrigger.init(rawValue:)) ?? .manual
+        allowsDuringFocus = defaults.bool(forKey: "monday.allowsDuringFocus")
+        let storedVolume = defaults.object(forKey: "monday.volume") == nil ? 0.8 : defaults.double(forKey: "monday.volume")
         volume = storedVolume.isFinite ? min(max(storedVolume, 0), 1) : 0.8
-        completedDays = Set(defaults.stringArray(forKey: Keys.completedDays) ?? [])
+        completedDays = Set(defaults.stringArray(forKey: "monday.completedDays") ?? [])
         installObservers()
-        updateTimer()
-        resetMouseBaseline()
         evaluateAutomaticPlayback()
     }
 
-    func play() {
-        guard !isClosed else { return }
-        startPlayback(completedDay: nil)
-    }
+    func play() { startPlayback(completedDay: nil) }
 
     func stop() {
         playbackGeneration = UUID()
         loadTask?.cancel()
         loadTask = nil
-        overlay?.stop()
-        overlay = nil
-        playbackDisplay = nil
+        overlays.forEach { $0.stop() }
+        overlays.removeAll()
+        playback?.stop()
+        playback = nil
+        playbackDisplays.removeAll()
+        completedDisplays.removeAll()
         state = .idle
     }
 
@@ -124,13 +118,12 @@ final class MondayController: ObservableObject {
 
     func refreshDisplays() {
         displays = displayProvider()
-        if let playbackDisplay, selectedDisplay != playbackDisplay { stop() }
+        if !playbackDisplays.isEmpty && selectedDisplays != playbackDisplays { stop() }
     }
 
     func sessionDidWake() {
         guard !isClosed else { return }
         unavailableReasons.remove(.inactive)
-        resetMouseBaseline()
         refreshDisplays()
         evaluateAutomaticPlayback()
     }
@@ -142,117 +135,119 @@ final class MondayController: ObservableObject {
         updateTimer()
     }
 
-    func evaluateAutomaticPlayback(mouseMoved: Bool? = nil) {
-        guard !isClosed, trigger != .manual, unavailableReasons.isEmpty, state == .idle, error == nil, selectedDisplay != nil else {
-            updateTimer()
-            return
-        }
-        let movement = mouseMoved ?? detectedMouseMovement()
-        let schedule = MondaySchedule(trigger: trigger, completedDays: completedDays)
-        guard let day = schedule.occurrence(at: now(), timeZone: timeZone(), mouseMoved: movement) else {
-            updateTimer()
-            return
-        }
+    func requestFocusAccess() async {
+        await MondayFocus.requestAccess()
+        evaluateAutomaticPlayback()
+    }
+
+    func evaluateAutomaticPlayback() {
+        guard !isClosed else { return }
+        let focused = focusProvider()
+        focusIsUnavailable = focused == nil
+        defer { updateTimer() }
+        guard trigger != .manual, unavailableReasons.isEmpty, state == .idle, error == nil,
+              !selectedDisplays.isEmpty, allowsDuringFocus || focused == false,
+              let day = schedule.occurrence(at: now(), timeZone: timeZone()) else { return }
         startPlayback(completedDay: day)
-        updateTimer()
+    }
+
+    private var schedule: MondaySchedule {
+        var seconds = 0
+        if trigger == .randomSunday, let window = MondaySchedule.window(on: now(), timeZone: timeZone()) {
+            var choices = defaults.dictionary(forKey: "monday.randomSeconds") as? [String: Int] ?? [:]
+            if let stored = choices[window.day], (0..<900).contains(stored) { seconds = stored }
+            else {
+                seconds = Int.random(in: 0..<900)
+                choices[window.day] = seconds
+                let days = choices.keys.sorted().suffix(16)
+                defaults.set(choices.filter { days.contains($0.key) }, forKey: "monday.randomSeconds")
+            }
+        }
+        return MondaySchedule(trigger: trigger, completedDays: completedDays, randomSecond: seconds)
     }
 
     private func startPlayback(completedDay: String?) {
-        guard !isClosed, state == .idle, let display = selectedDisplay else { return }
+        guard !isClosed, state == .idle, unavailableReasons.isEmpty, !selectedDisplays.isEmpty else { return }
+        let displays = selectedDisplays
         error = nil
         state = .loading
-        playbackDisplay = display
+        playbackDisplays = displays
         let generation = UUID()
         playbackGeneration = generation
         loadTask = Task { [weak self, library, loadPerformance] in
             do {
                 let performance = try await loadPerformance(library)
                 try Task.checkCancellation()
-                guard let self, self.playbackGeneration == generation, self.unavailableReasons.isEmpty,
-                      self.selectedDisplay == display else { return }
-                let overlay = try MondayOverlay(performance: performance, library: library, display: display,
-                                                volume: Float(self.volume), onError: { [weak self] error in
-                    guard let self, self.playbackGeneration == generation else { return }
-                    self.error = self.playbackError(for: error)
-                }) { [weak self] in self?.playbackFinished(generation: generation) }
-                self.overlay = overlay
-                do { try overlay.start() }
-                catch { overlay.stop(); self.overlay = nil; throw error }
-                guard self.playbackGeneration == generation else { overlay.stop(); return }
+                guard let self, self.playbackGeneration == generation else { return }
+                guard self.canPresent(on: displays, completedDay: completedDay) else { self.stop(); return }
+                let playback = try MondayPlayback(performance: performance, volume: Float(self.volume), participantCount: displays.count)
+                self.playback = playback
+                for display in displays {
+                    let overlay = try MondayOverlay(performance: performance, library: library, display: display,
+                                                    volume: Float(self.volume), playback: playback,
+                                                    onDismiss: { [weak self] in self?.stop() }, onError: { [weak self] error in
+                        guard let self, self.playbackGeneration == generation else { return }
+                        self.error = self.playbackError(for: error)
+                        self.stop()
+                    }) { [weak self] in self?.playbackFinished(displayID: display.id, generation: generation) }
+                    self.overlays.append(overlay)
+                }
+                guard self.canPresent(on: displays, completedDay: completedDay) else { self.stop(); return }
+                for overlay in self.overlays { try overlay.start() }
                 self.state = .playing
                 self.loadTask = nil
                 if let completedDay { self.recordCompletion(completedDay) }
-            } catch is CancellationError {
-                self?.finishCancelledLoad(generation: generation)
             } catch {
                 guard let self, self.playbackGeneration == generation else { return }
-                self.error = self.playbackError(for: error)
-                self.state = .idle
-                self.loadTask = nil
-                self.overlay?.stop()
-                self.overlay = nil
-                self.playbackDisplay = nil
+                if !(error is CancellationError) { self.error = self.playbackError(for: error) }
+                self.stop()
             }
         }
     }
 
-    private func playbackFinished(generation: UUID) {
-        guard playbackGeneration == generation else { return }
-        overlay = nil
-        playbackDisplay = nil
-        state = .idle
+    private func canPresent(on displays: [MondayDisplay], completedDay: String?) -> Bool {
+        guard unavailableReasons.isEmpty, selectedDisplays == displays else { return false }
+        guard let completedDay else { return true }
+        return (allowsDuringFocus || focusProvider() == false)
+            && schedule.occurrence(at: now(), timeZone: timeZone()) == completedDay
     }
 
-    private func finishCancelledLoad(generation: UUID) {
+    private func playbackFinished(displayID: String, generation: UUID) {
         guard playbackGeneration == generation else { return }
-        loadTask = nil
-        if overlay == nil {
-            playbackDisplay = nil
-            state = .idle
-        }
+        completedDisplays.insert(displayID)
+        if completedDisplays.count == playbackDisplays.count { stop() }
     }
 
     private func recordCompletion(_ day: String) {
         completedDays.insert(day)
         completedDays = Set(completedDays.sorted().suffix(16))
-        defaults.set(completedDays.sorted(), forKey: Keys.completedDays)
-    }
-
-    private func displayConfigurationChanged() {
-        if state != .idle { stop() }
-    }
-
-    private func detectedMouseMovement() -> Bool {
-        guard trigger == .firstActivity else { return false }
-        let counter = CGEventSource.counterForEventType(.combinedSessionState, eventType: .mouseMoved)
-        defer { mouseBaseline = counter }
-        guard let baseline = mouseBaseline else { return false }
-        return counter != baseline
-    }
-
-    private func resetMouseBaseline() {
-        mouseBaseline = trigger == .firstActivity
-            ? CGEventSource.counterForEventType(.combinedSessionState, eventType: .mouseMoved)
-            : nil
+        defaults.set(completedDays.sorted(), forKey: "monday.completedDays")
     }
 
     private func updateTimer() {
-        if trigger == .manual || !unavailableReasons.isEmpty {
-            timer?.invalidate()
-            timer = nil
-        } else if timer == nil {
-            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.evaluateAutomaticPlayback() }
-            }
+        timer?.invalidate()
+        timer = nil
+        guard !isClosed, trigger != .manual, unavailableReasons.isEmpty else { return }
+        let date = now()
+        let delay = max(1, MondaySchedule.nextCheck(after: date, timeZone: timeZone()).timeIntervalSince(date))
+        timer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.evaluateAutomaticPlayback() }
         }
+        timer?.tolerance = delay > 60 ? 1 : 0.1
     }
 
     private func installObservers() {
         let center = NotificationCenter.default
         let workspace = NSWorkspace.shared.notificationCenter
-        observers.append(center.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshDisplays() }
-        })
+        for name in [NSApplication.didChangeScreenParametersNotification, NSApplication.didBecomeActiveNotification,
+                     NSNotification.Name.NSSystemTimeZoneDidChange, NSNotification.Name.NSSystemClockDidChange] {
+            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.refreshDisplays()
+                    self?.evaluateAutomaticPlayback()
+                }
+            })
+        }
         for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.sessionDidResignActiveNotification] {
             observers.append(workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
@@ -268,7 +263,6 @@ final class MondayController: ObservableObject {
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     self.unavailableReasons.remove(name == NSWorkspace.screensDidWakeNotification ? .sleeping : .inactive)
-                    self.resetMouseBaseline()
                     self.refreshDisplays()
                     self.evaluateAutomaticPlayback()
                 }
