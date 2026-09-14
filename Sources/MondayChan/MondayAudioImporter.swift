@@ -2,7 +2,25 @@ import AVFoundation
 import AVFAudio
 
 enum MondayAudioImporter {
-    static func extract(from source: URL, to destination: URL) async throws {
+    private static let originalVideoRange = CMTimeRange(
+        start: CMTime(value: 300_696, timescale: 48_000),
+        duration: CMTime(value: 517_440, timescale: 48_000)
+    )
+
+    static func extractMonday(from source: URL, to destination: URL) async throws {
+        let duration = try await AVURLAsset(url: source).load(.duration).seconds
+        switch duration {
+        case 9.5...12:
+            try await extract(from: source, to: destination)
+        case 20...22:
+            try await extract(from: source, to: destination, timeRange: originalVideoRange, gain: 1.25)
+        default:
+            throw MondayImportError.unexpectedAudioDuration
+        }
+    }
+
+    static func extract(from source: URL, to destination: URL,
+                        timeRange: CMTimeRange? = nil, gain: Float = 1) async throws {
         let asset = AVURLAsset(url: source)
         let duration = try await asset.load(.duration).seconds
         guard duration.isFinite, duration > 0, duration <= 60,
@@ -26,6 +44,7 @@ enum MondayAudioImporter {
         trackOutput.alwaysCopiesSampleData = false
         guard reader.canAdd(trackOutput) else { throw MondayImportError.invalidMedia }
         reader.add(trackOutput)
+        if let timeRange { reader.timeRange = timeRange }
         guard reader.startReading() else { throw reader.error ?? MondayImportError.invalidMedia }
         defer { reader.cancelReading() }
         let output = try AVAudioFile(forWriting: destination, settings: [
@@ -49,6 +68,12 @@ enum MondayAudioImporter {
                       let destination = buffer.mutableAudioBufferList.pointee.mBuffers.mData,
                       CMBlockBufferCopyDataBytes(data, atOffset: 0, dataLength: bytes, destination: destination) == noErr else {
                     throw MondayImportError.invalidMedia
+                }
+                if gain != 1 {
+                    let samples = destination.bindMemory(to: Float.self, capacity: frames * Int(channels))
+                    for index in 0..<(frames * Int(channels)) {
+                        samples[index] = min(max(samples[index] * gain, -1), 1)
+                    }
                 }
                 try output.write(from: buffer)
                 writtenFrames += frames

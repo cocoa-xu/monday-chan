@@ -182,6 +182,6 @@ actor MondayImporter {
     }
 
     private func convertMedia(_ source: URL, to destination: URL) async throws {
-        try await MondayAudioImporter.extract(from: source, to: destination)
+        try await MondayAudioImporter.extractMonday(from: source, to: destination)
     }
 }

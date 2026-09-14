@@ -37,6 +37,32 @@ import Testing
     }
 }
 
+@Test func originalMondayVideoAudioIsTrimmedAndLeveledAutomatically() async throws {
+    let root = try importTestDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let source = root.appendingPathComponent("original.wav")
+    let destination = root.appendingPathComponent("monday.m4a")
+    let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+    let frames = 48_000 * 21
+    let input = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)))
+    input.frameLength = AVAudioFrameCount(frames)
+    for channel in 0..<2 {
+        for frame in 0..<frames {
+            input.floatChannelData?[channel][frame] = 0.2
+        }
+    }
+    do {
+        let file = try AVAudioFile(forWriting: source, settings: format.settings)
+        try file.write(from: input)
+    }
+    try await MondayAudioImporter.extractMonday(from: source, to: destination)
+    let output = try AVAudioFile(forReading: destination)
+    #expect(output.length == 517_440)
+    let decoded = try #require(AVAudioPCMBuffer(pcmFormat: output.processingFormat, frameCapacity: 1))
+    try output.read(into: decoded)
+    #expect(abs(try #require(decoded.floatChannelData?[0][0]) - 0.25) < 0.000001)
+}
+
 @Test func failedExtractionLeavesExistingDataAndSourceUntouched() async throws {
     let root = try importTestDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
