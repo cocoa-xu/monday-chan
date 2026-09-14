@@ -45,7 +45,7 @@
 "Choose two sources. The performance media is separate from the game or export folder." = "Choose two sources. The performance media is separate from the game or export folder.";
 "Game or export folder" = "Game or Export Folder";
 "Contains the model, motions, and expressions" = "Contains the model, motions, and expressions";
-"Performance video or audio" = "Performance Video or Audio";
+"Monday Video or Audio" = "Monday Video or Audio";
 "Contains the Monday performance audio" = "Contains the Monday performance audio";
 "Import failed" = "Import Failed";
 "Nothing is uploaded. Imported files stay on this Mac." = "Nothing is uploaded. Imported files stay on this Mac.";
@@ -66,7 +66,7 @@
 "Choose Game or Export Folder" = "Choose Game or Export Folder";
 "Select the folder that contains Kanade’s model, motions, and expressions." = "Select the folder that contains Kanade’s model, motions, and expressions.";
 "Choose Folder" = "Choose Folder";
-"Choose Performance Video or Audio" = "Choose Performance Video or Audio";
+"Choose Monday Video or Audio" = "Choose Monday Video or Audio";
 "Select the separate media file that contains the Monday performance audio." = "Select the separate media file that contains the Monday performance audio.";
 "Choose Media" = "Choose Media";
 "Open Original Video" = "Open Original Video";

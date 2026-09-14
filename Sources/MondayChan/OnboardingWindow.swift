@@ -86,7 +86,7 @@ final class MondayOnboardingModel: ObservableObject {
 
     func chooseMediaFile(text: LocalizedText) {
         let panel = NSOpenPanel()
-        panel.title = text("Choose Performance Video or Audio")
+        panel.title = text("Choose Monday Video or Audio")
         panel.message = text("Select the separate media file that contains the Monday performance audio.")
         panel.prompt = text("Choose Media")
         panel.canChooseDirectories = false
@@ -269,7 +269,7 @@ struct MondayOnboardingView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     sourceCard(title: text("Game or export folder"), detail: model.gameFolder?.path(percentEncoded: false),
                                empty: text("Contains the model, motions, and expressions"), action: { model.chooseGameFolder(text: text) })
-                    sourceCard(title: text("Performance video or audio"), detail: model.mediaFile?.lastPathComponent,
+                    sourceCard(title: text("Monday Video or Audio"), detail: model.mediaFile?.lastPathComponent,
                                empty: text("Contains the Monday performance audio"), action: { model.chooseMediaFile(text: text) })
                         .dropDestination(for: URL.self) { urls, _ in model.acceptMedia(urls) }
                     HStack {

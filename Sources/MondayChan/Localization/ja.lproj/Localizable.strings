@@ -45,7 +45,7 @@
 "Choose two sources. The performance media is separate from the game or export folder." = "2つの場所を選択します。パフォーマンス用メディアは、ゲームまたはエクスポートフォルダとは別に指定します。";
 "Game or export folder" = "ゲームまたはエクスポートフォルダ";
 "Contains the model, motions, and expressions" = "モデル・モーション・表情データを含むフォルダ";
-"Performance video or audio" = "パフォーマンス用の動画または音声";
+"Monday Video or Audio" = "月曜日の動画または音声";
 "Contains the Monday performance audio" = "月曜日パフォーマンスの音声を含むファイル";
 "Import failed" = "インポートに失敗しました";
 "Nothing is uploaded. Imported files stay on this Mac." = "アップロードは行いません。インポートしたファイルはこのMac内に保存されます。";
@@ -66,7 +66,7 @@
 "Choose Game or Export Folder" = "ゲームまたはエクスポートフォルダを選択";
 "Select the folder that contains Kanade’s model, motions, and expressions." = "奏のモデル・モーション・表情データを含むフォルダを選択してください。";
 "Choose Folder" = "フォルダを選択";
-"Choose Performance Video or Audio" = "パフォーマンス用の動画または音声を選択";
+"Choose Monday Video or Audio" = "月曜日の動画または音声を選択";
 "Select the separate media file that contains the Monday performance audio." = "月曜日パフォーマンスの音声を含む別のメディアファイルを選択してください。";
 "Choose Media" = "メディアを選択";
 "Open Original Video" = "元の動画を開く";

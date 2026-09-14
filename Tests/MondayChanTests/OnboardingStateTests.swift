@@ -31,6 +31,8 @@ import Testing
     let japanese = LocalizedText(language: .japanese)
     #expect(english("Set up Monday-chan") == "Set Up Monday-chan")
     #expect(japanese("Set up Monday-chan") == "月曜日ちゃんをセットアップ")
+    #expect(english("Monday Video or Audio") == "Monday Video or Audio")
+    #expect(japanese("Monday Video or Audio") == "月曜日の動画または音声")
     #expect(japanese("Open Original Video") == "元の動画を開く")
     #expect(japanese.controls.search == "検索")
 }
