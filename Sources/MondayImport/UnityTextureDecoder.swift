@@ -13,7 +13,7 @@ final class UnityTextureDecoder {
               let queue = device.makeCommandQueue() else { throw AssetError.missing("ASTC-capable Metal device") }
         self.device = device
         self.queue = queue
-        guard let shaderURL = Bundle.module.url(forResource: "MondayImport", withExtension: "metallib") else {
+        guard let shaderURL = MondayImportResources.bundle.url(forResource: "MondayImport", withExtension: "metallib") else {
             throw AssetError.missing("texture decoder shaders")
         }
         let library = try device.makeLibrary(URL: shaderURL)
