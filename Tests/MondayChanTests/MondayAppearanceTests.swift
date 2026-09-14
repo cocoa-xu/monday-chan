@@ -97,7 +97,10 @@ import Testing
 @Test func menuBarPreferencesAreLocalized() {
     let english = LocalizedText(language: .english)
     let japanese = LocalizedText(language: .japanese)
-    #expect(english("Mini sign") == "Mini sign")
+    #expect(english("Mini sign") == "Mini Sign")
+    #expect(english("Icon style") == "Icon Style")
+    #expect(english("Automatic playback") == "Automatic Playback")
+    #expect(english("Version and acknowledgements") == "Version and Acknowledgements")
     #expect(japanese("Menu Bar") == "メニューバー")
     #expect(japanese("Mini sign") == "ミニ看板")
     #expect(japanese("Plain text") == "文字のみ")

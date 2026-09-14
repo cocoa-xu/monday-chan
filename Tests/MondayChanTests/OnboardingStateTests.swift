@@ -29,7 +29,7 @@ import Testing
 @Test func onboardingCopyIsLocalizedInEnglishAndJapanese() {
     let english = LocalizedText(language: .english)
     let japanese = LocalizedText(language: .japanese)
-    #expect(english("Set up Monday-chan") == "Set up Monday-chan")
+    #expect(english("Set up Monday-chan") == "Set Up Monday-chan")
     #expect(japanese("Set up Monday-chan") == "月曜日ちゃんをセットアップ")
     #expect(japanese("Open Original Video") == "元の動画を開く")
     #expect(japanese.controls.search == "検索")
