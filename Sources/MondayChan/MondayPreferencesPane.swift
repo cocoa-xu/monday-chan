@@ -37,7 +37,9 @@ struct MondayPreferencesPane: View {
                     }
                 }
                 PreferencesRowSeparator()
-                PreferencesSliderRow(symbol: "speaker.wave.2", title: text("Volume"), value: $controller.volume, in: 0...1, step: 0.05) {
+                PreferencesSliderRow(symbol: "speaker.wave.2", title: text("Volume"), value: $controller.volume,
+                                     in: 0...1, step: 0.05,
+                                     style: .inline(sliderWidth: 240)) {
                     String(format: "%.0f%%", $0 * 100)
                 }
                 PreferencesRowSeparator()
@@ -49,6 +51,7 @@ struct MondayPreferencesPane: View {
                             .foregroundStyle(controller.state == .idle ? MondayTheme.onAccent : MondayTheme.accent.foreground)
                     }
                     .buttonStyle(FlowingSoftButtonStyle(isProminent: controller.state == .idle))
+                    .flowingAccent(MondayTheme.switchAccent)
                     .disabled(controller.state == .idle && controller.selectedDisplays.isEmpty)
                     .opacity(controller.state == .idle && controller.selectedDisplays.isEmpty ? 0.45 : 1)
                 }

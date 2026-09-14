@@ -7,7 +7,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [.executable(name: "MondayChan", targets: ["MondayChan"])],
     dependencies: [
-        .package(url: "https://github.com/cocoa-xu/flowing-day-ui.git", exact: "2.6.4")
+        .package(url: "https://github.com/cocoa-xu/flowing-day-ui.git", exact: "2.6.5")
     ],
     targets: [
         .target(name: "MondayCore"),
