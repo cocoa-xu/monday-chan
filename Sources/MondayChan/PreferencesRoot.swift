@@ -119,16 +119,16 @@ struct PreferencesRoot: View {
                 if appearance.showsMenuBarIcon {
                     PreferencesRowSeparator()
                     PreferencesRow(symbol: "character", title: text("Icon style")) {
-                        HStack(spacing: 12) {
-                            if appearance.menuBarIconStyle == .sign, let image = MondayMenuBarIcon.sign {
-                                Image(nsImage: image)
-                            } else {
-                                Text("月").font(.system(size: 14, weight: .medium))
-                            }
-                            FlowingSelect(label: text("Icon style"), selection: $appearance.menuBarIconStyle,
-                                          options: [.init(.sign, label: text("Mini sign")), .init(.text, label: text("Plain text"))],
-                                          minimumWidth: 180).frame(width: 180)
-                        }
+                        FlowingSegmentedControl(
+                            label: text("Icon style"),
+                            selection: $appearance.menuBarIconStyle,
+                            options: [
+                                .init(.sign, label: text("Mini sign"), systemImage: "rectangle.inset.filled"),
+                                .init(.text, label: text("Plain text"), systemImage: "character.textbox")
+                            ],
+                            labelStyle: .iconAndText
+                        )
+                        .frame(width: 280)
                     }
                 }
             }
