@@ -30,7 +30,7 @@ struct LocalizedText {
         switch error {
         case MondayImportError.invalidGameFolder: self("The selected folder does not contain the required game assets.")
         case MondayImportError.invalidMedia: self("The selected media file does not contain usable audio.")
-        case MondayImportError.unexpectedAudioDuration: self("Choose the original Monday video, approximately 11 seconds long.")
+        case MondayImportError.unexpectedAudioDuration: self("This does not look like the Monday video. Choose the original clip or its audio and try again.")
         case MondayImportError.extractionFailed(let message): self("Asset extraction failed.\n%@", message)
         case MondayImportError.unsafeDestination: self("The import destination is unsafe.")
         case MondayImportError.incomplete(let path): self("The imported assets are incomplete: %@", path)

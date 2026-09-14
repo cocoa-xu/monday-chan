@@ -48,6 +48,7 @@
 "Monday Video or Audio" = "月曜日の動画または音声";
 "Contains the Monday performance audio" = "月曜日パフォーマンスの音声を含むファイル";
 "Import failed" = "インポートに失敗しました";
+"Check Your Video" = "動画を確認してください";
 "Nothing is uploaded. Imported files stay on this Mac." = "アップロードは行いません。インポートしたファイルはこのMac内に保存されます。";
 "Import" = "インポート";
 "Retry" = "再試行";
@@ -74,7 +75,7 @@
 "Stop Preview" = "プレビューを停止";
 "The selected folder does not contain the required game assets." = "選択したフォルダに必要なゲームデータが見つかりません。";
 "The selected media file does not contain usable audio." = "選択したメディアファイルに利用できる音声がありません。";
-"Choose the original Monday video, approximately 11 seconds long." = "約11秒の元の月曜日動画を選択してください。";
+"This does not look like the Monday video. Choose the original clip or its audio and try again." = "月曜日の動画ではないようです。元の動画、またはその音声を選び直してください。";
 "Asset extraction failed.\n%@" = "リソースの抽出に失敗しました。\n%@";
 "The import destination is unsafe." = "インポート先を安全に使用できません。";
 "The imported assets are incomplete: %@" = "インポートしたリソースが不足しています：%@";

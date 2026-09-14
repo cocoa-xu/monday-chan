@@ -46,31 +46,49 @@ final class OnboardingWindow: NSWindow {
 @MainActor
 final class MondayOnboardingModel: ObservableObject {
     enum State: Equatable { case selection, importing, failed(String) }
+    enum MediaValidation: Equatable { case empty, checking, valid, invalid(String) }
+    typealias ValidateMedia = @Sendable (URL) async throws -> Void
 
     @Published var gameFolder: URL?
     @Published var mediaFile: URL?
     @Published private(set) var state: State = .selection
+    @Published private(set) var mediaValidation: MediaValidation = .empty
     @Published private(set) var progress = MondayImportProgress(phase: .locating, fraction: 0)
     @Published private(set) var isPreviewing = false
     let destination: URL
     private let importer = MondayImporter()
     private let errorText: (Error) -> String
+    private let validateMedia: ValidateMedia
     private let onImported: () -> Void
     private var task: Task<Void, Never>?
+    private var mediaValidationTask: Task<Void, Never>?
     private var previewPlayer: AVPlayer?
     private var previewObservers: [NSObjectProtocol] = []
     private var generation = 0
+    private var mediaGeneration = 0
 
     init(destination: URL, errorText: @escaping (Error) -> String = { $0.localizedDescription },
          initialState: State = .selection,
+         validateMedia: @escaping ValidateMedia = { try await MondayAudioImporter.validateMondayMedia($0) },
          onImported: @escaping () -> Void) {
         self.destination = destination
         self.errorText = errorText
         state = initialState
+        self.validateMedia = validateMedia
         self.onImported = onImported
     }
 
-    var canImport: Bool { gameFolder != nil && mediaFile != nil && state != .importing }
+    var canImport: Bool { gameFolder != nil && mediaFile != nil && mediaValidation == .valid && state != .importing }
+    var mediaIsChecking: Bool { mediaValidation == .checking }
+    var mediaHasError: Bool {
+        if case .invalid = mediaValidation { return true }
+        return false
+    }
+    var errorMessage: String? {
+        if case .invalid(let message) = mediaValidation { return message }
+        if case .failed(let message) = state { return message }
+        return nil
+    }
 
     func chooseGameFolder(text: LocalizedText) {
         let panel = NSOpenPanel()
@@ -92,17 +110,13 @@ final class MondayOnboardingModel: ObservableObject {
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowedContentTypes = [.audiovisualContent, .audio, .movie]
-        guard panel.runModal() == .OK else { return }
-        mediaFile = panel.url
-        stopPreview()
-        if case .failed = state { state = .selection }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        selectMedia(url)
     }
 
     func acceptMedia(_ urls: [URL]) -> Bool {
         guard let url = urls.first, ["mp4", "mov", "m4a", "mp3", "wav"].contains(url.pathExtension.lowercased()) else { return false }
-        mediaFile = url
-        stopPreview()
-        if case .failed = state { state = .selection }
+        selectMedia(url)
         return true
     }
 
@@ -171,10 +185,42 @@ final class MondayOnboardingModel: ObservableObject {
 
     func cancel() {
         stopPreview()
+        mediaValidationTask?.cancel()
+        mediaValidationTask = nil
+        if mediaValidation == .checking {
+            mediaFile = nil
+            mediaValidation = .empty
+        }
         generation += 1
         task?.cancel()
         task = nil
         if state == .importing { state = .selection }
+    }
+
+    private func selectMedia(_ url: URL) {
+        stopPreview()
+        mediaValidationTask?.cancel()
+        mediaGeneration += 1
+        let generation = mediaGeneration
+        mediaFile = url
+        mediaValidation = .checking
+        if case .failed = state { state = .selection }
+        mediaValidationTask = Task { [weak self, validateMedia] in
+            guard let self else { return }
+            do {
+                try await validateMedia(url)
+                try Task.checkCancellation()
+                guard self.mediaGeneration == generation else { return }
+                self.mediaValidation = .valid
+                self.mediaValidationTask = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                guard self.mediaGeneration == generation else { return }
+                self.mediaValidation = .invalid(self.errorText(error))
+                self.mediaValidationTask = nil
+            }
+        }
     }
 }
 
@@ -218,8 +264,8 @@ struct MondayOnboardingView: View {
     private var rail: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                if let image = MondayMenuBarIcon.sign {
-                    Image(nsImage: image).resizable().scaledToFit().frame(width: 30, height: 25)
+                if let image = NSApp.applicationIconImage {
+                    Image(nsImage: image).resizable().scaledToFit().frame(width: 34, height: 34)
                 }
                 Text("Monday-chan").font(.system(size: 18, weight: .bold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.8)
             }
@@ -249,12 +295,13 @@ struct MondayOnboardingView: View {
         }
     }
 
-    @ViewBuilder private var content: some View {
-        switch model.state {
-        case .selection, .failed:
+    private var content: some View {
+        ZStack {
             selection
-        case .importing:
-            importing
+            if model.state == .importing {
+                FlowingPalette.canvas.opacity(0.96)
+                importing
+            }
         }
     }
 
@@ -270,7 +317,8 @@ struct MondayOnboardingView: View {
                     sourceCard(title: text("Game or export folder"), detail: model.gameFolder?.path(percentEncoded: false),
                                empty: text("Contains the model, motions, and expressions"), action: { model.chooseGameFolder(text: text) })
                     sourceCard(title: text("Monday Video or Audio"), detail: model.mediaFile?.lastPathComponent,
-                               empty: text("Contains the Monday performance audio"), action: { model.chooseMediaFile(text: text) })
+                               empty: text("Contains the Monday performance audio"), isChecking: model.mediaIsChecking,
+                               hasError: model.mediaHasError, action: { model.chooseMediaFile(text: text) })
                         .dropDestination(for: URL.self) { urls, _ in model.acceptMedia(urls) }
                     HStack {
                         Button(text("Open Original Video")) {
@@ -283,9 +331,9 @@ struct MondayOnboardingView: View {
                     }
                     Text(text("Download the original clip yourself, then choose or drop the MP4 or MOV here. The app extracts a local audio copy and leaves your video unchanged."))
                         .font(.caption).foregroundStyle(FlowingPalette.faint)
-                    if case .failed(let message) = model.state {
+                    if let message = model.errorMessage {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(text("Import failed")).font(.headline).foregroundStyle(.red)
+                            Text(text(model.mediaHasError ? "Check Your Video" : "Import failed")).font(.headline).foregroundStyle(.red)
                             Text(message).font(.caption).foregroundStyle(FlowingPalette.muted).textSelection(.enabled)
                         }
                     }
@@ -317,10 +365,19 @@ struct MondayOnboardingView: View {
         }
     }
 
-    private func sourceCard(title: String, detail: String?, empty: String, action: @escaping () -> Void) -> some View {
+    private func sourceCard(title: String, detail: String?, empty: String, isChecking: Bool = false,
+                            hasError: Bool = false, action: @escaping () -> Void) -> some View {
         HStack(spacing: 14) {
-            Image(systemName: detail == nil ? "circle.dashed" : "checkmark.circle.fill")
-                .font(.title2).foregroundStyle(detail == nil ? FlowingPalette.muted : MondayTheme.accent.foreground)
+            Group {
+                if isChecking {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: detail == nil ? "circle.dashed" : hasError ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(hasError ? AnyShapeStyle(Color.red) : AnyShapeStyle(detail == nil ? FlowingPalette.muted : MondayTheme.accent.foreground))
+                }
+            }
+            .frame(width: 24)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.headline)
                 Text(detail ?? empty).font(.caption).foregroundStyle(FlowingPalette.muted).lineLimit(2)

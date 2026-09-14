@@ -48,6 +48,7 @@
 "Monday Video or Audio" = "Monday Video or Audio";
 "Contains the Monday performance audio" = "Contains the Monday performance audio";
 "Import failed" = "Import Failed";
+"Check Your Video" = "Check Your Video";
 "Nothing is uploaded. Imported files stay on this Mac." = "Nothing is uploaded. Imported files stay on this Mac.";
 "Import" = "Import";
 "Retry" = "Retry";
@@ -74,7 +75,7 @@
 "Stop Preview" = "Stop Preview";
 "The selected folder does not contain the required game assets." = "The selected folder does not contain the required game assets.";
 "The selected media file does not contain usable audio." = "The selected media file does not contain usable audio.";
-"Choose the original Monday video, approximately 11 seconds long." = "Choose the original Monday video, approximately 11 seconds long.";
+"This does not look like the Monday video. Choose the original clip or its audio and try again." = "This does not look like the Monday video. Choose the original clip or its audio and try again.";
 "Asset extraction failed.\n%@" = "Asset extraction failed.\n%@";
 "The import destination is unsafe." = "The import destination is unsafe.";
 "The imported assets are incomplete: %@" = "The imported assets are incomplete: %@";

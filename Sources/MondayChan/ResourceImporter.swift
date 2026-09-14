@@ -45,7 +45,7 @@ enum MondayImportError: LocalizedError, Equatable {
         switch self {
         case .invalidGameFolder: "The selected folder does not contain the required game assets."
         case .invalidMedia: "The selected media file does not contain usable audio."
-        case .unexpectedAudioDuration: "Choose the original Monday video, approximately 11 seconds long."
+        case .unexpectedAudioDuration: "This does not look like the Monday video. Choose the original clip or its audio and try again."
         case .extractionFailed(let message): message.isEmpty ? "Asset extraction failed." : message
         case .unsafeDestination: "The import destination is unsafe."
         case .incomplete(let path): "The imported assets are incomplete: \(path)"
@@ -164,7 +164,9 @@ actor MondayImporter {
         guard file.length > 0, file.length <= AVAudioFramePosition(file.processingFormat.sampleRate * 60),
               file.processingFormat.channelCount <= 2 else { throw MondayImportError.invalidMedia }
         let duration = Double(file.length) / file.processingFormat.sampleRate
-        guard (9.5...12).contains(duration) else { throw MondayImportError.unexpectedAudioDuration }
+        guard abs(duration - MondayAudioImporter.performanceDuration) <= MondayAudioImporter.durationTolerance else {
+            throw MondayImportError.unexpectedAudioDuration
+        }
         return MondayImportedAssets(root: library.root, model: model, idleMotion: idle, runMotion: run,
                                     mouthsDirectory: library.root.appendingPathComponent(character.mouths), audio: audio)
     }

@@ -3,6 +3,18 @@ import Foundation
 import Testing
 @testable import MondayChan
 
+@Test func mondayMediaDurationAllowsOnlyHalfASecondOfDrift() throws {
+    #expect(try MondayAudioImporter.profile(for: 10.3) == .performance)
+    #expect(try MondayAudioImporter.profile(for: 11.27) == .performance)
+    #expect(try MondayAudioImporter.profile(for: 20.79) == .originalVideo)
+    #expect(try MondayAudioImporter.profile(for: 21.78) == .originalVideo)
+    for duration in [9.5, 11.3, 20.7, 21.8, 60] {
+        #expect(throws: MondayImportError.unexpectedAudioDuration) {
+            try MondayAudioImporter.profile(for: duration)
+        }
+    }
+}
+
 @Test func audioImportPreservesSamplesChannelsAndTimingInLosslessStorage() async throws {
     let root = try importTestDirectory()
     defer { try? FileManager.default.removeItem(at: root) }

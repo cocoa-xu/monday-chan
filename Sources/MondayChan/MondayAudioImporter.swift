@@ -2,20 +2,41 @@ import AVFoundation
 import AVFAudio
 
 enum MondayAudioImporter {
+    enum Profile: Equatable {
+        case performance
+        case originalVideo
+    }
+
+    static let performanceDuration = 10.78
+    static let originalVideoDuration = 21.283333
+    static let durationTolerance = 0.5
     private static let originalVideoRange = CMTimeRange(
         start: CMTime(value: 300_696, timescale: 48_000),
         duration: CMTime(value: 517_440, timescale: 48_000)
     )
 
+    static func profile(for duration: Double) throws -> Profile {
+        guard duration.isFinite, duration > 0 else { throw MondayImportError.invalidMedia }
+        if abs(duration - performanceDuration) <= durationTolerance { return .performance }
+        if abs(duration - originalVideoDuration) <= durationTolerance { return .originalVideo }
+        throw MondayImportError.unexpectedAudioDuration
+    }
+
+    static func validateMondayMedia(_ source: URL) async throws {
+        let asset = AVURLAsset(url: source)
+        _ = try profile(for: try await asset.load(.duration).seconds)
+        guard try await asset.loadTracks(withMediaType: .audio).first != nil else {
+            throw MondayImportError.invalidMedia
+        }
+    }
+
     static func extractMonday(from source: URL, to destination: URL) async throws {
         let duration = try await AVURLAsset(url: source).load(.duration).seconds
-        switch duration {
-        case 9.5...12:
+        switch try profile(for: duration) {
+        case .performance:
             try await extract(from: source, to: destination)
-        case 20...22:
+        case .originalVideo:
             try await extract(from: source, to: destination, timeRange: originalVideoRange, gain: 1.25)
-        default:
-            throw MondayImportError.unexpectedAudioDuration
         }
     }
 
