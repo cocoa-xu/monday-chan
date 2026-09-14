@@ -8,7 +8,7 @@ public enum MondayAssetExtractionPhase: Sendable {
 public enum MondayAssetExtractor {
     static let mouthCells = [0, 7, 17, 35]
     static let expressionPath = "characters/06002/expressions/"
-    static let preparedFiles = ["characters.json", "models/06002.glb", "motions/idle01_typ000_lp_bdy00.json",
+    public static let preparedFiles = ["characters.json", "models/06002.glb", "motions/idle01_typ000_lp_bdy00.json",
                                 "motions/run00_typ000_lp_bdy00.json", expressionPath + "index.json"]
         + mouthCells.map { expressionPath + String(format: "mouth_%02d.png", $0) }
 
