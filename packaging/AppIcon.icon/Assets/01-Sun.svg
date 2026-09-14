@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs><radialGradient cx='.46' cy='.36' id='sun' r='.78'>
+      <stop stop-color='#fffad1'/><stop offset='.46' stop-color='#ffe64c'/><stop offset='1' stop-color='#dfa014'/>
+    </radialGradient></defs><g id='background'>
+    <path d='M0 0h1024v1024H0z' fill='url(#sun)'/>
+    <g fill='#fffce9' opacity='.27'>
+      <path d='M512 510L90 0H290zM512 510L708 0H960zM512 510L1024 260V430zM512 510L1024 725V997zM512 510L778 1024H582zM512 510L220 1024H0zM512 510L0 500V270z'/>
+    </g>
+  </g>
+</svg>

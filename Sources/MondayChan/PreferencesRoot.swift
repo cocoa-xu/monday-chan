@@ -26,7 +26,7 @@ struct PreferencesRoot: View {
     var body: some View {
         PreferencesView(selection: $page, configuration: PreferencesViewConfiguration(
             applicationName: "Monday-chan", preferencesTitle: text("Preferences"),
-            applicationIcon: MondayMenuBarIcon.sign, defaultAccent: MondayTheme.accent,
+            defaultAccent: MondayTheme.accent,
             strings: PreferencesStrings(closePreferences: text("Close Preferences"), controls: text.controls)
         ), groups: [
             PreferencesPageGroup(id: "monday", pages: [

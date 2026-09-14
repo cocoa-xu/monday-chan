@@ -18,7 +18,7 @@ Only the required character resources are imported. Audio is extracted locally i
 
 ## Build
 
-With Xcode, its Metal Toolchain component, and Swift 6.1 or later:
+With Xcode 26 or later, its Metal Toolchain component, and Swift 6.1 or later:
 
 ```sh
 scripts/build.sh

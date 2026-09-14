@@ -6,6 +6,8 @@
     <key>CFBundleIdentifier</key><string>moe.uwucocoa.MondayChan</string>
     <key>CFBundleName</key><string>Monday-chan</string>
     <key>CFBundleDisplayName</key><string>Monday-chan</string>
+    <key>CFBundleIconName</key><string>AppIcon</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleDevelopmentRegion</key><string>en</string>
     <key>CFBundleLocalizations</key><array><string>en</string><string>ja</string></array>
     <key>CFBundlePackageType</key><string>APPL</string>
