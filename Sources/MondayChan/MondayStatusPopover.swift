@@ -16,6 +16,13 @@ enum MondayStatusBarAction: Equatable {
     }
 }
 
+enum MondayStatusPopoverDismissal {
+    static func shouldDismiss(clickedWindow: Int, popoverWindow: Int?, statusItemWindow: Int?) -> Bool {
+        guard let popoverWindow else { return false }
+        return clickedWindow != popoverWindow && clickedWindow != statusItemWindow
+    }
+}
+
 struct MondayStatusPopover: View {
     let playbackTitle: String?
     let playbackSymbol: String

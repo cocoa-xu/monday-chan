@@ -112,6 +112,13 @@ import Testing
     #expect(MondayStatusBarAction.resolve(eventType: nil) == .preferences)
 }
 
+@Test func statusPopoverDismissesOnlyForOutsideWindows() {
+    #expect(!MondayStatusPopoverDismissal.shouldDismiss(clickedWindow: 10, popoverWindow: nil, statusItemWindow: 20))
+    #expect(!MondayStatusPopoverDismissal.shouldDismiss(clickedWindow: 10, popoverWindow: 10, statusItemWindow: 20))
+    #expect(!MondayStatusPopoverDismissal.shouldDismiss(clickedWindow: 20, popoverWindow: 10, statusItemWindow: 20))
+    #expect(MondayStatusPopoverDismissal.shouldDismiss(clickedWindow: 30, popoverWindow: 10, statusItemWindow: 20))
+}
+
 private func contrast(_ first: NSColor, _ second: NSColor) -> Double {
     func luminance(_ color: NSColor) -> Double {
         let rgb = color.usingColorSpace(.sRGB)!

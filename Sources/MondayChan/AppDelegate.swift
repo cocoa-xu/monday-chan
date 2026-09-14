@@ -5,7 +5,7 @@ import MondayCore
 import SwiftUI
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let localization = AppLocalization()
     private let appearance = MondayAppearance()
     private var resources: MondayResources!
@@ -15,6 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboarding: OnboardingWindow?
     private var statusItem: NSStatusItem?
     private let statusPopover = NSPopover()
+    private var localStatusPopoverMonitor: Any?
+    private var globalStatusPopoverMonitor: Any?
     private var languageSubscription: AnyCancellable?
     private var stateSubscription: AnyCancellable?
     private var localeSubscription: AnyCancellable?
@@ -46,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         startupTask?.cancel()
         onboarding?.cancel()
-        statusPopover.close()
+        closeStatusPopover()
         controller?.close()
     }
 
@@ -121,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] dock, menuBar in
                 NSApp.setActivationPolicy(dock ? .regular : .accessory)
                 if !menuBar, let item = self?.statusItem {
-                    self?.statusPopover.close()
+                    self?.closeStatusPopover()
                     NSStatusBar.system.removeStatusItem(item)
                     self?.statusItem = nil
                 }
@@ -177,12 +179,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusPopover.behavior = .transient
         statusPopover.animates = false
         statusPopover.hasFullSizeContent = true
+        statusPopover.delegate = self
     }
 
     private func toggleStatusPopover() {
         guard let button = statusItem?.button else { return }
         if statusPopover.isShown {
-            statusPopover.performClose(nil)
+            closeStatusPopover()
             return
         }
         let text = localization.text
@@ -191,7 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             playbackSymbol: controller?.state == .idle ? "play.fill" : "stop.fill",
             quitTitle: text("Quit"),
             togglePlayback: { [weak self] in
-                self?.statusPopover.performClose(nil)
+                self?.closeStatusPopover()
                 self?.togglePlayback()
             },
             quit: { [weak self] in self?.quit() }
@@ -199,6 +202,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusPopover.contentSize = NSSize(width: controller == nil ? 70 : 130, height: 60)
         statusPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
+        installStatusPopoverMonitors()
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        removeStatusPopoverMonitors()
+    }
+
+    private func installStatusPopoverMonitors() {
+        removeStatusPopoverMonitors()
+        localStatusPopoverMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown]
+        ) { [weak self] event in
+            guard let self else { return event }
+            if event.type == .keyDown, event.keyCode == 53 {
+                closeStatusPopover()
+                return nil
+            }
+            if MondayStatusPopoverDismissal.shouldDismiss(
+                clickedWindow: event.windowNumber,
+                popoverWindow: statusPopover.contentViewController?.view.window?.windowNumber,
+                statusItemWindow: statusItem?.button?.window?.windowNumber
+            ) {
+                closeStatusPopover()
+            }
+            return event
+        }
+        globalStatusPopoverMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in
+            Task { @MainActor in self?.closeStatusPopover() }
+        }
+    }
+
+    private func closeStatusPopover() {
+        statusPopover.performClose(nil)
+        removeStatusPopoverMonitors()
+    }
+
+    private func removeStatusPopoverMonitors() {
+        if let localStatusPopoverMonitor { NSEvent.removeMonitor(localStatusPopoverMonitor) }
+        if let globalStatusPopoverMonitor { NSEvent.removeMonitor(globalStatusPopoverMonitor) }
+        localStatusPopoverMonitor = nil
+        globalStatusPopoverMonitor = nil
     }
 
     private func showFatal(_ error: Error) {
@@ -213,7 +259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func handleStatusBarClick() {
         switch MondayStatusBarAction.resolve(eventType: NSApp.currentEvent?.type) {
         case .preferences:
-            statusPopover.performClose(nil)
+            closeStatusPopover()
             showPreferences()
         case .quickControls:
             toggleStatusPopover()
