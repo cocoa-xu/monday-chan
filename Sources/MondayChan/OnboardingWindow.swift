@@ -194,9 +194,14 @@ struct MondayOnboardingView: View {
                 }
             }
             Button { window.close() } label: {
-                Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)).frame(width: 28, height: 28)
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(FlowingPalette.muted)
+                    .frame(width: 28, height: 28)
+                    .background(FlowingPalette.card, in: Circle())
+                    .contentShape(Circle())
             }
-            .buttonStyle(FlowingSoftButtonStyle())
+            .buttonStyle(.plain)
             .accessibilityLabel(text("Close setup"))
             .padding(14)
         }
@@ -227,7 +232,7 @@ struct MondayOnboardingView: View {
             VStack(alignment: .leading, spacing: 18) {
                 step("01", text("Choose resources"), active: model.state != .importing)
                 step("02", text("Import and verify"), active: model.state == .importing)
-                step("03", text("Enjoy Monday"), active: false)
+                step("03", text("Brace for Monday"), active: false)
             }
         }
         .padding(.horizontal, 28).padding(.vertical, 40)
@@ -291,7 +296,9 @@ struct MondayOnboardingView: View {
                 Text(text("Nothing is uploaded. Imported files stay on this Mac."))
                     .font(.caption).foregroundStyle(FlowingPalette.faint)
                 Spacer()
-                Button(text(model.state == .selection ? "Import" : "Retry"), action: model.startImport)
+                Button(action: model.startImport) {
+                    Text(text(model.state == .selection ? "Import" : "Retry")).foregroundStyle(MondayTheme.onAccent)
+                }
                     .buttonStyle(FlowingSoftButtonStyle(isProminent: true)).disabled(!model.canImport)
             }
         }

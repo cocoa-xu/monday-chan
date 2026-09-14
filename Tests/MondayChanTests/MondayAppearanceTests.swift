@@ -52,7 +52,7 @@ import Testing
                 Issue.record("Theme colors must resolve to sRGB.")
                 return
             }
-            #expect(contrast(fill, .white) >= 4.5)
+            #expect(contrast(fill, NSColor(MondayTheme.onAccent)) >= 4.5)
             #expect(contrast(foreground, canvas) >= 4.5)
             #expect(fill.redComponent > fill.greenComponent)
             #expect(fill.greenComponent > fill.blueComponent)
@@ -114,4 +114,19 @@ private func contrast(_ first: NSColor, _ second: NSColor) -> Double {
     }
     let a = luminance(first), b = luminance(second)
     return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+}
+
+@Test @MainActor func menuBarAndDockCanBothBeHiddenAndPersistIndependently() throws {
+    let suite = "MondayPresenceTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let appearance = MondayAppearance(defaults: defaults)
+    #expect(appearance.showsDockIcon && appearance.showsMenuBarIcon)
+    appearance.showsDockIcon = false
+    #expect(appearance.showsMenuBarIcon)
+    appearance.showsMenuBarIcon = false
+    let restored = MondayAppearance(defaults: defaults)
+    #expect(!restored.showsDockIcon && !restored.showsMenuBarIcon)
+    restored.showsDockIcon = true
+    #expect(!restored.showsMenuBarIcon)
 }

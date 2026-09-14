@@ -21,10 +21,10 @@ func exportMenuBarPreferencesInBothLanguagesAndAppearances() throws {
             let appearance = MondayAppearance(defaults: defaults)
             let controller = MondayController(library: library, defaults: defaults)
             defer { controller.close() }
-            for page in [PreferencesRoot.Page.general, .playback] {
+            for page in [PreferencesRoot.Page.general, .playback, .resources, .about] {
                 let presenter = PreferencesWindowPresenter(rootView: PreferencesRoot(
-                    controller: controller, localization: localization, appearance: appearance,
-                    dataRoot: root, page: page, manageResources: {}
+                    resources: MondayResources(root: root, controller: controller), localization: localization, appearance: appearance,
+                    loginItem: LoginItem(), page: page, manageResources: {}
                 ))
                 let window = presenter.window
                 defer { window.close() }

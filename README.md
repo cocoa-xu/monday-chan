@@ -3,7 +3,7 @@
 A small macOS desktop performance: Kanade peeks up from the bottom of your screen, jumps around with a Monday placard, and runs away.
 
 - Native Metal rendering, synchronized expressions, and transparent mouse passthrough.
-- Manual playback or a Monday schedule, with monitor and volume controls.
+- Preview on demand or schedule one Sunday-night surprise on your selected monitors.
 - English and Japanese, using [FlowingDayUI](https://github.com/cocoa-xu/flowing-day-ui).
 
 Requires macOS 14 or later on Apple silicon. No game assets or performance audio are included.
@@ -12,7 +12,7 @@ Requires macOS 14 or later on Apple silicon. No game assets or performance audio
 
 1. Choose your locally exported game files or game directory in the first-run window.
 2. Save the video from [YouTube Japan’s original post](https://x.com/YouTubeJapan/status/2091495920311414921), then drop the downloaded MP4/MOV into the window or choose it from disk. The clip is approximately 11 seconds long.
-3. Preview the audio and import. Choose a monitor in Preferences, then press Play.
+3. Preview the audio and import. Choose your monitors in Preferences, then press Play.
 
 Only the required character resources are imported. Audio is extracted locally into lossless ALAC. Your source files remain unchanged; nothing is uploaded. Right-click Kanade to dismiss her.
 

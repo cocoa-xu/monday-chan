@@ -7,7 +7,9 @@ import MondayCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let localization = AppLocalization()
     private let appearance = MondayAppearance()
-    private var controller: MondayController?
+    private var resources: MondayResources!
+    private var controller: MondayController? { resources?.controller }
+    private let loginItem = LoginItem()
     private var preferences: PreferencesWindowPresenter<PreferencesRoot>?
     private var onboarding: OnboardingWindow?
     private var statusItem: NSStatusItem?
@@ -15,12 +17,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var stateSubscription: AnyCancellable?
     private var localeSubscription: AnyCancellable?
     private var appearanceSubscription: AnyCancellable?
+    private var presenceSubscription: AnyCancellable?
+    private var resourceSubscription: AnyCancellable?
+    private var launchedAtLogin = false
     private var startupTask: Task<Void, Never>?
     private var dataRoot: URL!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
             dataRoot = try resolveDataRoot()
+            launchedAtLogin = LoginItem.launchedAtLogin
+            resources = MondayResources(root: dataRoot)
+            preferences = PreferencesWindowPresenter(rootView: PreferencesRoot(
+                resources: resources, localization: localization, appearance: appearance, loginItem: loginItem,
+                manageResources: { [weak self] in self?.showOnboarding() }
+            ))
             installSubscriptions()
             installMenus()
             startupTask = Task { [weak self] in await self?.restoreOrOnboard() }
@@ -37,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         localization.refresh()
+        loginItem.refresh()
     }
 
     private func resolveDataRoot() throws -> URL {
@@ -57,28 +69,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch is CancellationError {
             return
         } catch {
-            showOnboarding()
+            if !launchedAtLogin { showOnboarding() }
         }
     }
 
     private func activatePlayback() {
         do {
-            controller?.close()
-            let controller = MondayController(library: try AssetLibrary(root: dataRoot))
-            self.controller = controller
-            preferences = PreferencesWindowPresenter(rootView: PreferencesRoot(
-                controller: controller, localization: localization, appearance: appearance, dataRoot: dataRoot,
-                manageResources: { [weak self] in self?.showOnboarding() }
-            ))
-            stateSubscription = controller.$state.dropFirst().sink { [weak self] _ in
-                DispatchQueue.main.async { [weak self] in self?.installMenus() }
-            }
+            try resources.activate()
+            guard let controller else { return }
             onboarding?.close()
             onboarding = nil
             installMenus()
-            if CommandLine.arguments.contains("--preferences") { showPreferences() }
+            if !launchedAtLogin || CommandLine.arguments.contains("--preferences") { showPreferences() }
             if CommandLine.arguments.contains("--play-monday") {
-                if controller.selectedDisplayID == nil { controller.selectedDisplayID = controller.displays.first?.id }
+                if controller.selectedDisplayIDs.isEmpty, let display = controller.displays.first { controller.selectedDisplayIDs = [display.id] }
                 controller.play()
             }
         } catch {
@@ -94,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if onboarding == nil {
             onboarding = OnboardingWindow(destination: dataRoot, localization: localization, onCancel: { [weak self] in
                 self?.controller?.sessionDidWake()
+                self?.showPreferences()
             }) { [weak self] in
                 self?.activatePlayback()
                 self?.showPreferences()
@@ -102,7 +107,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onboarding?.show()
     }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showPreferences()
+        return false
+    }
+
     private func installSubscriptions() {
+        presenceSubscription = appearance.$showsDockIcon.combineLatest(appearance.$showsMenuBarIcon)
+            .sink { [weak self] dock, menuBar in
+                NSApp.setActivationPolicy(dock ? .regular : .accessory)
+                if !menuBar, let item = self?.statusItem {
+                    NSStatusBar.system.removeStatusItem(item)
+                    self?.statusItem = nil
+                }
+                DispatchQueue.main.async { [weak self] in self?.installMenus() }
+            }
+        resourceSubscription = resources.$controller.sink { [weak self] controller in
+            self?.stateSubscription = controller?.$state.sink { [weak self] _ in
+                DispatchQueue.main.async { [weak self] in self?.installMenus() }
+            }
+            DispatchQueue.main.async { [weak self] in self?.installMenus() }
+        }
         appearanceSubscription = appearance.$menuBarIconStyle.sink { [weak self] style in
             guard let button = self?.statusItem?.button else { return }
             MondayMenuBarIcon.apply(style, to: button)
@@ -118,8 +143,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installMenus() {
         let text = localization.text
         let menu = NSMenu()
-        let setup = menu.addItem(withTitle: controller == nil ? text("Set Up Monday-chan…") : text("Preferences…"),
-                                 action: controller == nil ? #selector(openSetup) : #selector(showPreferences), keyEquivalent: ",")
+        let setup = menu.addItem(withTitle: text("Preferences…"),
+                                 action: #selector(showPreferences), keyEquivalent: ",")
         setup.target = self
         if let controller {
             let playback = menu.addItem(withTitle: controller.state == .idle ? text("Play Monday-chan") : text("Stop Monday-chan"),
@@ -129,7 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         let quit = menu.addItem(withTitle: text("Quit Monday-chan"), action: #selector(quit), keyEquivalent: "q")
         quit.target = self
-        if statusItem == nil { statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength) }
+        if appearance.showsMenuBarIcon && statusItem == nil { statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength) }
         if let button = statusItem?.button { MondayMenuBarIcon.apply(appearance.menuBarIconStyle, to: button) }
         statusItem?.menu = menu
         let main = NSMenu()
@@ -146,11 +171,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
 
-    @objc private func openSetup() { showOnboarding() }
     @objc private func showPreferences() { preferences?.show() }
     @objc private func togglePlayback() {
         guard let controller else { return }
-        if controller.state == .idle, controller.selectedDisplay == nil { showPreferences() }
+        if controller.state == .idle, controller.selectedDisplays.isEmpty { showPreferences() }
         else { controller.state == .idle ? controller.play() : controller.stop() }
     }
     @objc private func quit() { NSApp.terminate(nil) }

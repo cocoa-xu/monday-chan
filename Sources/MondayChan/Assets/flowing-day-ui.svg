@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>FlowingDayUI Sakura Petal</title>
+  <style>
+    .petal-back { fill: #ffd0e4; }
+    .petal-front { fill: #faa8c9; }
+
+    @media (prefers-color-scheme: dark) {
+      .petal-back { fill: #fdb1ce; }
+      .petal-front { fill: #f594c3; }
+    }
+  </style>
+  <g transform="rotate(-4 28 29)">
+    <rect class="petal-back" x="10" y="12" width="35" height="34" rx="12" />
+  </g>
+  <g transform="rotate(4 37 35)">
+    <rect class="petal-front" x="20" y="18" width="34" height="34" rx="12" />
+  </g>
+</svg>

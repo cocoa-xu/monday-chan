@@ -9,6 +9,12 @@ enum MenuBarIconStyle: String, CaseIterable {
 
 @MainActor
 final class MondayAppearance: ObservableObject {
+    @Published var showsMenuBarIcon: Bool {
+        didSet { defaults.set(showsMenuBarIcon, forKey: "showsMenuBarIcon") }
+    }
+    @Published var showsDockIcon: Bool {
+        didSet { defaults.set(showsDockIcon, forKey: "showsDockIcon") }
+    }
     @Published var menuBarIconStyle: MenuBarIconStyle {
         didSet { defaults.set(menuBarIconStyle.rawValue, forKey: "menuBarIconStyle") }
     }
@@ -16,16 +22,23 @@ final class MondayAppearance: ObservableObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        showsMenuBarIcon = defaults.object(forKey: "showsMenuBarIcon") as? Bool ?? true
+        showsDockIcon = defaults.object(forKey: "showsDockIcon") as? Bool ?? true
         menuBarIconStyle = defaults.string(forKey: "menuBarIconStyle").flatMap(MenuBarIconStyle.init(rawValue:)) ?? .sign
     }
 }
 
 enum MondayTheme {
+    static let onAccent = FlowingPalette.dynamic(light: 0x3B2A08, dark: 0x3B2A08)
     static let accent = FlowingAccent(
-        fill: FlowingPalette.dynamic(light: 0x9B6800, dark: 0x946300),
-        foreground: FlowingPalette.dynamic(light: 0x7F5100, dark: 0xFFD947),
-        wash: FlowingPalette.translucent(light: 0xF5A900, lightAlpha: 0.19, dark: 0xFFD947, darkAlpha: 0.18),
-        veil: FlowingPalette.translucent(light: 0xF5A900, lightAlpha: 0.09, dark: 0xFFD947, darkAlpha: 0.09)
+        fill: FlowingPalette.dynamic(light: 0xFFE51A, dark: 0xFFE51A),
+        foreground: FlowingPalette.dynamic(light: 0x765B00, dark: 0xFFE51A),
+        wash: FlowingPalette.translucent(light: 0xFFE51A, lightAlpha: 0.24, dark: 0xFFE51A, darkAlpha: 0.18),
+        veil: FlowingPalette.translucent(light: 0xFFE51A, lightAlpha: 0.12, dark: 0xFFE51A, darkAlpha: 0.09)
+    )
+    static let switchAccent = FlowingAccent(
+        fill: FlowingPalette.dynamic(light: 0xF2D531, dark: 0xF2D531),
+        foreground: accent.foreground
     )
 }
 
