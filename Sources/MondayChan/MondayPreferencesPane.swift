@@ -48,10 +48,8 @@ struct MondayPreferencesPane: View {
                         controller.state == .idle ? controller.play() : controller.stop()
                     } label: {
                         Text(text(controller.state == .idle ? "Play" : "Stop"))
-                            .foregroundStyle(controller.state == .idle ? MondayTheme.onAccent : MondayTheme.accent.foreground)
                     }
-                    .buttonStyle(FlowingSoftButtonStyle(isProminent: controller.state == .idle))
-                    .flowingAccent(MondayTheme.switchAccent)
+                    .buttonStyle(FlowingSoftButtonStyle())
                     .disabled(controller.state == .idle && controller.selectedDisplays.isEmpty)
                     .opacity(controller.state == .idle && controller.selectedDisplays.isEmpty ? 0.45 : 1)
                 }

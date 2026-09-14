@@ -101,6 +101,15 @@ import Testing
     #expect(japanese("Menu Bar") == "メニューバー")
     #expect(japanese("Mini sign") == "ミニ看板")
     #expect(japanese("Plain text") == "文字のみ")
+    #expect(japanese("Quit") == "終了")
+    #expect(english("Ready or not, Monday-chan is coming.") == "Ready or not, Monday-chan is coming.")
+    #expect(japanese("Ready or not, Monday-chan is coming.") == "準備はいい？ 月曜日ちゃんがやってくるよ。")
+}
+
+@Test func statusBarClicksOpenTheExpectedDestination() {
+    #expect(MondayStatusBarAction.resolve(eventType: .leftMouseUp) == .preferences)
+    #expect(MondayStatusBarAction.resolve(eventType: .rightMouseUp) == .quickControls)
+    #expect(MondayStatusBarAction.resolve(eventType: nil) == .preferences)
 }
 
 private func contrast(_ first: NSColor, _ second: NSColor) -> Double {

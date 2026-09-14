@@ -10,6 +10,7 @@
 "Volume" = "音量";
 "Play" = "再生";
 "Stop" = "停止";
+"Quit" = "終了";
 "Manual only" = "手動のみ";
 "Imported resources" = "インポート済みのリソース";
 "Data folder" = "データフォルダ";
@@ -92,6 +93,7 @@
 "Open Monday-chan from Applications to return to Preferences." = "設定を開くには、アプリケーションからMonday-chanを起動してください。";
 "Version and acknowledgements" = "バージョンと謝辞";
 "Version %@" = "バージョン %@";
+"Ready or not, Monday-chan is coming." = "準備はいい？ 月曜日ちゃんがやってくるよ。";
 "Reusable preferences windows and macOS interface components." = "設定ウインドウとmacOS向けのUIコンポーネント。";
 "No resources imported" = "リソース未読み込み";
 "Import…" = "読み込む…";

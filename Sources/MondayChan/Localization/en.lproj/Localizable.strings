@@ -10,6 +10,7 @@
 "Volume" = "Volume";
 "Play" = "Play";
 "Stop" = "Stop";
+"Quit" = "Quit";
 "Manual only" = "Manual only";
 "Imported resources" = "Imported resources";
 "Data folder" = "Data folder";
@@ -92,6 +93,7 @@
 "Open Monday-chan from Applications to return to Preferences." = "Open Monday-chan from Applications to return to Preferences.";
 "Version and acknowledgements" = "Version and acknowledgements";
 "Version %@" = "Version %@";
+"Ready or not, Monday-chan is coming." = "Ready or not, Monday-chan is coming.";
 "Reusable preferences windows and macOS interface components." = "Reusable preferences windows and macOS interface components.";
 "No resources imported" = "No resources imported";
 "Import…" = "Import…";

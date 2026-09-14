@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import FlowingDayPreferences
 import MondayCore
+import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -13,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var preferences: PreferencesWindowPresenter<PreferencesRoot>?
     private var onboarding: OnboardingWindow?
     private var statusItem: NSStatusItem?
+    private let statusPopover = NSPopover()
     private var languageSubscription: AnyCancellable?
     private var stateSubscription: AnyCancellable?
     private var localeSubscription: AnyCancellable?
@@ -33,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 manageResources: { [weak self] in self?.showOnboarding() }
             ))
             installSubscriptions()
+            configureStatusPopover()
             installMenus()
             startupTask = Task { [weak self] in await self?.restoreOrOnboard() }
         } catch {
@@ -43,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         startupTask?.cancel()
         onboarding?.cancel()
+        statusPopover.close()
         controller?.close()
     }
 
@@ -117,6 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] dock, menuBar in
                 NSApp.setActivationPolicy(dock ? .regular : .accessory)
                 if !menuBar, let item = self?.statusItem {
+                    self?.statusPopover.close()
                     NSStatusBar.system.removeStatusItem(item)
                     self?.statusItem = nil
                 }
@@ -155,12 +160,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let quit = menu.addItem(withTitle: text("Quit Monday-chan"), action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         if appearance.showsMenuBarIcon && statusItem == nil { statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength) }
-        if let button = statusItem?.button { MondayMenuBarIcon.apply(appearance.menuBarIconStyle, to: button) }
-        statusItem?.menu = menu
+        if let button = statusItem?.button {
+            MondayMenuBarIcon.apply(appearance.menuBarIconStyle, to: button)
+            button.target = self
+            button.action = #selector(handleStatusBarClick)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
+        statusItem?.menu = nil
         let main = NSMenu()
         let item = main.addItem(withTitle: "Monday-chan", action: nil, keyEquivalent: "")
         item.submenu = menu.copy() as? NSMenu
         NSApp.mainMenu = main
+    }
+
+    private func configureStatusPopover() {
+        statusPopover.behavior = .transient
+        statusPopover.animates = false
+        statusPopover.hasFullSizeContent = true
+    }
+
+    private func toggleStatusPopover() {
+        guard let button = statusItem?.button else { return }
+        if statusPopover.isShown {
+            statusPopover.performClose(nil)
+            return
+        }
+        let text = localization.text
+        statusPopover.contentViewController = NSHostingController(rootView: MondayStatusPopover(
+            playbackTitle: controller.map { text($0.state == .idle ? "Play" : "Stop") },
+            playbackSymbol: controller?.state == .idle ? "play.fill" : "stop.fill",
+            quitTitle: text("Quit"),
+            togglePlayback: { [weak self] in
+                self?.statusPopover.performClose(nil)
+                self?.togglePlayback()
+            },
+            quit: { [weak self] in self?.quit() }
+        ))
+        statusPopover.contentSize = NSSize(width: controller == nil ? 70 : 130, height: 60)
+        statusPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func showFatal(_ error: Error) {
@@ -172,6 +210,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showPreferences() { preferences?.show() }
+    @objc private func handleStatusBarClick() {
+        switch MondayStatusBarAction.resolve(eventType: NSApp.currentEvent?.type) {
+        case .preferences:
+            statusPopover.performClose(nil)
+            showPreferences()
+        case .quickControls:
+            toggleStatusPopover()
+        }
+    }
     @objc private func togglePlayback() {
         guard let controller else { return }
         if controller.state == .idle, controller.selectedDisplays.isEmpty { showPreferences() }

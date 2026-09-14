@@ -155,6 +155,9 @@ struct PreferencesRoot: View {
                 Text("Monday-chan").font(.title2.bold())
                 Text(text("Version %@", Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"))
                     .foregroundStyle(FlowingPalette.muted)
+                Text(text("Ready or not, Monday-chan is coming."))
+                    .foregroundStyle(FlowingPalette.muted)
+                    .padding(.top, 8)
             }
             PreferencesSection(text("Acknowledgements")) {
                 PreferencesRow(icon: flowingDayIcon, title: "FlowingDayUI",
